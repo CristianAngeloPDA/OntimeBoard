@@ -111,6 +111,7 @@
             </div>
 
             <!-- ===== BARRA DE FILTROS GLOBAIS ===== -->
+            <!-- Ordem: Ontime → Tipo Dev → Montadora → Sistema -->
             <div class="filters-bar" id="filtersBar">
               <div class="filter-group">
                 <label for="filterOntime">
@@ -123,22 +124,22 @@
               </div>
 
               <div class="filter-group">
-                <label for="filterMontadora">
-                  <i class="fas fa-industry"></i>
-                  Montadora
-                </label>
-                <select id="filterMontadora">
-                  <option value="">Todas</option>
-                </select>
-              </div>
-
-              <div class="filter-group">
                 <label for="filterTipoDev">
                   <i class="fas fa-tag"></i>
                   Tipo Dev
                 </label>
                 <select id="filterTipoDev">
                   <option value="">Todos</option>
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <label for="filterMontadora">
+                  <i class="fas fa-industry"></i>
+                  Montadora
+                </label>
+                <select id="filterMontadora">
+                  <option value="">Todas</option>
                 </select>
               </div>
 
@@ -163,7 +164,7 @@
               </button>
             </div>
 
-            <!-- Banner de filtros ativos (fora da barra, entre filtros e cards) -->
+            <!-- Banner de filtros ativos -->
             <div class="filters-active-banner" id="filtersActiveBadge">
               <span class="filters-active-dot"></span>
               <i class="fas fa-filter"></i>
