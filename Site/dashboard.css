@@ -72,8 +72,6 @@ body {
   min-width: 44px;
 }
 
-/* Espaçador invisível para equilibrar a navbar quando o lado
-   direito não tem botões visíveis */
 .navbar-spacer {
   width: 44px;
 }
@@ -231,7 +229,6 @@ body {
   margin-right: 8px;
 }
 
-/* Contador de arquivos no cabeçalho do menu */
 .file-count {
   font-size: 0.7rem;
   color: #889bb0;
@@ -503,7 +500,6 @@ body {
   flex-shrink: 0;
 }
 
-/* Variantes de cor dos ícones dos cards */
 .stat-icon.blue   { background: #e3f2fd; color: #1976d2; }
 .stat-icon.green  { background: #e8f5e9; color: #388e3c; }
 .stat-icon.orange { background: #fff3e0; color: #f57c00; }
@@ -875,6 +871,20 @@ body {
   outline-offset: 1px;
 }
 
+/* Filtro "Sistema" da lista quando desabilitado (global ativo) */
+.filter-group.list-only select:disabled {
+  background: #f5f2f0;
+  color: #b8a9a3;
+  border-color: #e0d8d5;
+  cursor: not-allowed;
+  opacity: 0.75;
+  font-style: italic;
+}
+
+.filter-group.list-only select:disabled:hover {
+  border-color: #e0d8d5;
+}
+
 .btn-clear-list-filters {
   background: transparent;
   border: 1px solid #e8cfc8;
@@ -905,7 +915,6 @@ body {
   outline-offset: 1px;
 }
 
-/* Banner ESTÁTICO explicando os filtros exclusivos da lista */
 .list-filters-banner {
   display: flex;
   align-items: center;
@@ -1028,6 +1037,11 @@ body {
 .dsd-badge.falha-CF1   { background: #fff3e0; color: #e65100; }
 .dsd-badge.falha-CFgt1 { background: #e8f5e9; color: #2e7d32; }
 .dsd-badge.falha-SF    { background: #fdecea; color: #c62828; }
+
+/* Etiqueta "Lançada" / "Não Lançada" */
+.dsd-badge.lancada-sim   { background: #e8f5e9; color: #2e7d32; }
+.dsd-badge.lancada-nao   { background: #fdecea; color: #c62828; }
+.dsd-badge.lancada-outro { background: #f0f4fa; color: #4f657b; }
 
 .dsd-list-empty {
   text-align: center;

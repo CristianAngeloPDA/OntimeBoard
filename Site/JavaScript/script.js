@@ -6,14 +6,17 @@
  * - Atualização do dashboard (título, subtítulo, placeholders)
  * - Escuta dos eventos disparados pela Estrutura
  *
- * 🔥 NOVO:
+ * Recursos:
  * - filtro global de Tipo Dev (barra superior) — afeta gráficos E lista
  * - lista de cargas (DESCRIÇÃO DSD) abaixo dos gráficos
- * - filtros exclusivos da lista: Segmento, Sistema e Falhas
+ * - filtros exclusivos da lista: Segmento, Sistema, Lançada e Falhas
  *   (NÃO afetam os gráficos; só filtram a lista)
  * - cada grupo de filtros tem seu PRÓPRIO botão de limpar
  * - FILTROS CASCATEADOS: os selects de Montadora (global) e de
  *   Sistema (da lista) só mostram opções presentes no Ontime atual
+ * - etiqueta "Lançada" / "Não Lançada" em cada carga da lista
+ * - CONFLITO DE SISTEMA: quando o Sistema global estiver ativo,
+ *   o Sistema da lista é desabilitado (evita redundância)
  */
 
 (function () {
@@ -77,7 +80,7 @@
       dashboardTitle: DOM.dashboardTitle,
       dashboardSubtitle: DOM.dashboardSubtitle,
 
-      // Filtros globais (afetam gráficos + cards + lista)
+      // Filtros globais
       filtersBar: document.getElementById("filtersBar"),
       filterOntime: document.getElementById("filterOntime"),
       filterMontadora: document.getElementById("filterMontadora"),
@@ -86,13 +89,14 @@
       btnClearFilters: document.getElementById("btnClearFilters"),
       filtersActiveBadge: document.getElementById("filtersActiveBadge"),
 
-      // 🔥 Filtros exclusivos da lista (NÃO afetam gráficos)
+      // Filtros exclusivos da lista
       filterSegmento: document.getElementById("filterSegmento"),
       filterListSistema: document.getElementById("filterListSistema"),
+      filterLancada: document.getElementById("filterLancada"),
       filterFalhas: document.getElementById("filterFalhas"),
       btnClearListFilters: document.getElementById("btnClearListFilters"),
 
-      // Lista de cargas (Descrição DSD)
+      // Lista de cargas
       dsdListContainer: document.getElementById("dsdListContainer"),
       dsdListCount: document.getElementById("dsdListCount"),
       dsdListSubtitle: document.getElementById("dsdListSubtitle"),
@@ -112,14 +116,14 @@
         montadora: "",
         tipoDev: "",
         sistema: "",
-        // 🔥 Exclusivos da lista — NÃO afetam os gráficos
+        // Exclusivos da lista — NÃO afetam os gráficos
         segmento: "",
         listSistema: "",
+        lancada: "",
         falhas: "",
       },
     };
 
-    /** Reseta APENAS os 4 filtros globais */
     function resetGlobalFiltersState() {
       ScriptState.filters.ontime = "";
       ScriptState.filters.montadora = "";
@@ -127,14 +131,13 @@
       ScriptState.filters.sistema = "";
     }
 
-    /** Reseta APENAS os 3 filtros exclusivos da lista */
     function resetListFiltersState() {
       ScriptState.filters.segmento = "";
       ScriptState.filters.listSistema = "";
+      ScriptState.filters.lancada = "";
       ScriptState.filters.falhas = "";
     }
 
-    /** Reseta tudo (usado ao trocar de arquivo) */
     function resetAllFiltersState() {
       resetGlobalFiltersState();
       resetListFiltersState();
@@ -187,7 +190,6 @@
           Graficos.updateStats(processedData);
           Graficos.renderCharts(processedData);
 
-          // Lista completa (sem filtros)
           renderDsdList(ScriptState.allRawData);
 
           console.log("[Dashboard] Gráficos renderizados com sucesso");
@@ -278,6 +280,19 @@
           addBadge(falha, cls, "fa-exclamation-triangle");
         }
 
+        // Etiqueta "Lançada" / "Não Lançada"
+        const lancada = (row.lancada || "").toString().trim();
+        if (lancada && lancada !== "\\N") {
+          const norm = normalizeText(lancada);
+          if (norm === "LANCADA") {
+            addBadge(lancada, "lancada-sim", "fa-check-circle");
+          } else if (norm === "NAO LANCADA") {
+            addBadge(lancada, "lancada-nao", "fa-times-circle");
+          } else {
+            addBadge(lancada, "lancada-outro", "fa-upload");
+          }
+        }
+
         item.appendChild(meta);
         fragment.appendChild(item);
       });
@@ -290,65 +305,49 @@
     // 4.1 FUNÇÕES DE FILTRO
     // ============================================
 
-    /**
-     * Preenche todos os selects do dashboard.
-     *
-     * Ontime, Tipo Dev (global), Segmento e Falhas são preenchidos
-     * com TODOS os valores do arquivo.
-     *
-     * Montadora (global) e Sistema (lista) NÃO são preenchidos
-     * aqui — eles cascateiam do Ontime e são populados por
-     * `refreshMontadoraOptions()` e `refreshListSistemaOptions()`.
-     */
     function populateFilters(rawData) {
       const Dados = window.OntimeBoard.Dados;
 
-      // ---- Ontime (todos os valores) ----
       fillSelectOptions(
         DashboardElements.filterOntime,
         Dados.getDistinctValues(rawData, "ontime"),
         "Todos",
       );
 
-      // ---- Montadora (cascateada do Ontime) ----
       refreshMontadoraOptions();
 
-      // ---- Tipo Dev global (todos os valores) ----
       fillSelectOptions(
         DashboardElements.filterTipoDev,
         Dados.getDistinctValues(rawData, "tipoDev"),
         "Todos",
       );
 
-      // ---- Filtros exclusivos da lista ----
       fillSelectOptions(
         DashboardElements.filterSegmento,
         Dados.getDistinctValues(rawData, "segmento"),
         "Todos",
       );
 
-      // Sistema da lista (cascateado do Ontime)
       refreshListSistemaOptions();
+
+      fillSelectOptions(
+        DashboardElements.filterLancada,
+        Dados.getDistinctValues(rawData, "lancada"),
+        "Todas",
+      );
 
       fillSelectOptions(
         DashboardElements.filterFalhas,
         Dados.getDistinctValues(rawData, "falhas"),
         "Todas",
       );
+
+      // Sincroniza o estado do select da lista (enabled/disabled)
+      syncListSistemaDisabledState();
     }
 
     /**
-     * 🔥 FILTRO CASCATEADO — Montadora (global)
-     *
-     * Repopula o select de Montadora com apenas as montadoras que
-     * existem no Ontime atualmente selecionado.
-     *
-     * Regras:
-     *  - Ontime = "" (Todos) → mostra todas as montadoras do arquivo
-     *  - Ontime = "JULHO"    → mostra só as montadoras que têm
-     *                          pelo menos uma linha em JULHO
-     *  - Se a montadora previamente selecionada não existir mais na
-     *    nova lista, reseta para "Todas" (evita filtro "fantasma")
+     * Filtro cascateado — Montadora (global).
      */
     function refreshMontadoraOptions() {
       const Dados = window.OntimeBoard && window.OntimeBoard.Dados;
@@ -361,7 +360,6 @@
         : ScriptState.allRawData;
 
       const montadoras = Dados.getDistinctValues(base, "montadora");
-
       const montadoraAtual = ScriptState.filters.montadora;
 
       fillSelectOptions(
@@ -379,13 +377,7 @@
     }
 
     /**
-     * 🔥 FILTRO CASCATEADO — Sistema (exclusivo da lista)
-     *
-     * Repopula o select de Sistema da lista com apenas os sistemas
-     * presentes no Ontime atualmente selecionado.
-     *
-     * Mesma lógica de `refreshMontadoraOptions()`, mas aplicada ao
-     * select `filterListSistema` (que só afeta a lista).
+     * Filtro cascateado — Sistema (exclusivo da lista).
      */
     function refreshListSistemaOptions() {
       const Dados = window.OntimeBoard && window.OntimeBoard.Dados;
@@ -398,7 +390,6 @@
         : ScriptState.allRawData;
 
       const sistemas = Dados.getDistinctValues(base, "sistema");
-
       const sistemaAtual = ScriptState.filters.listSistema;
 
       fillSelectOptions(
@@ -412,6 +403,34 @@
       } else {
         DashboardElements.filterListSistema.value = "";
         ScriptState.filters.listSistema = "";
+      }
+    }
+
+    /**
+     * Sincroniza o estado do filtro "Sistema" da lista com o
+     * filtro "Sistema" global.
+     *
+     * Regra: se o Sistema global estiver ativo, o Sistema da lista
+     * é desabilitado e seu valor resetado (o global sobrepõe).
+     */
+    function syncListSistemaDisabledState() {
+      const el = DashboardElements.filterListSistema;
+      if (!el) return;
+
+      const globalSistemaAtivo = !!ScriptState.filters.sistema;
+
+      if (globalSistemaAtivo) {
+        // Reseta o valor do filtro da lista e desabilita
+        if (ScriptState.filters.listSistema) {
+          ScriptState.filters.listSistema = "";
+        }
+        el.value = "";
+        el.disabled = true;
+        el.title =
+          "Desabilitado — o filtro de Sistema da barra superior já está ativo";
+      } else {
+        el.disabled = false;
+        el.title = "";
       }
     }
 
@@ -445,14 +464,6 @@
       }
     }
 
-    /**
-     * Aplica os filtros ativos sobre o dataset completo.
-     *
-     * - Os 4 filtros GLOBAIS (Ontime, Montadora, TipoDev, Sistema)
-     *   afetam os gráficos E a lista.
-     * - Os 3 filtros EXCLUSIVOS DA LISTA (Segmento, Sistema, Falhas)
-     *   afetam SOMENTE a lista.
-     */
     function applyFilters() {
       const Dados = window.OntimeBoard.Dados;
       const Graficos = window.OntimeBoard.Graficos;
@@ -465,6 +476,7 @@
         sistema,
         segmento,
         listSistema,
+        lancada,
         falhas,
       } = ScriptState.filters;
 
@@ -472,10 +484,10 @@
       const tipoDevNorm = normalizeText(tipoDev);
       const segmentoNorm = normalizeText(segmento);
       const listSistemaNorm = normalizeText(listSistema);
+      const lancadaNorm = normalizeText(lancada);
       const falhasNorm = normalizeText(falhas);
 
-      // 1) Base com filtros GLOBAIS (usada pelos gráficos e como ponto
-      //    de partida para a lista)
+      // Base com filtros globais
       const filteredRaw = ScriptState.allRawData.filter((r) => {
         const matchOntime = !ontime || r.ontime === ontime;
         const matchMontadora = !montadora || r.montadora === montadora;
@@ -487,32 +499,37 @@
         return matchOntime && matchMontadora && matchTipoDev && matchSistema;
       });
 
-      // 2) Lista — aplica também os filtros exclusivos
+      // Lista — aplica filtros exclusivos também
       const listOnlyFiltered = filteredRaw.filter((r) => {
         const matchSegmento =
           !segmentoNorm || normalizeText(r.segmento) === segmentoNorm;
         const matchListSistema =
           !listSistemaNorm ||
           normalizeText(r.sistema) === listSistemaNorm;
+        const matchLancada =
+          !lancadaNorm || normalizeText(r.lancada) === lancadaNorm;
         const matchFalhas =
           !falhasNorm || normalizeText(r.falhas) === falhasNorm;
 
-        return matchSegmento && matchListSistema && matchFalhas;
+        return (
+          matchSegmento &&
+          matchListSistema &&
+          matchLancada &&
+          matchFalhas
+        );
       });
 
       console.log(
         `[Filtros] Globais → ${filteredRaw.length} carga(s) | ` +
-          `Lista (com segmento/sistema/falhas) → ${listOnlyFiltered.length} carga(s)`,
+          `Lista → ${listOnlyFiltered.length} carga(s)`,
       );
 
-      // ---- Gráficos e cards usam a base SEM os filtros exclusivos ----
       const filteredData = Dados.processData(filteredRaw);
       ScriptState.currentData = filteredData;
 
       Graficos.updateStats(filteredData);
       Graficos.renderCharts(filteredData);
 
-      // ---- Lista usa a base COM todos os filtros ----
       renderDsdList(listOnlyFiltered);
 
       const hasActiveFilter = !!(
@@ -522,6 +539,7 @@
         sistema ||
         segmento ||
         listSistema ||
+        lancada ||
         falhas
       );
       if (DashboardElements.filtersActiveBadge) {
@@ -532,20 +550,12 @@
       }
     }
 
-    /**
-     * 🔥 Botão principal ("Limpar filtros" da barra superior):
-     * reseta APENAS os 4 filtros globais. Os filtros exclusivos
-     * da lista permanecem intactos.
-     *
-     * ⚠️ Também repopula as montadoras (voltam todas).
-     */
     function clearGlobalFilters() {
       resetGlobalFiltersState();
 
       if (DashboardElements.filterOntime) {
         DashboardElements.filterOntime.value = "";
       }
-      // Repopula montadoras com TODAS (Ontime = "Todos")
       refreshMontadoraOptions();
 
       if (DashboardElements.filterTipoDev) {
@@ -555,22 +565,26 @@
         DashboardElements.filterSistema.value = "";
       }
 
+      // Reabilita o filtro de Sistema da lista (global foi limpo)
+      syncListSistemaDisabledState();
+
       applyFilters();
     }
 
-    /**
-     * 🔥 Botão da lista ("Limpar" ao lado dos filtros exclusivos):
-     * reseta APENAS os filtros exclusivos da lista (Segmento,
-     * Sistema e Falhas). Os filtros globais permanecem intactos.
-     */
     function clearListFilters() {
       resetListFiltersState();
 
       if (DashboardElements.filterSegmento) {
         DashboardElements.filterSegmento.value = "";
       }
+      // Só limpa/atualiza o Sistema da lista se não estiver desabilitado
       if (DashboardElements.filterListSistema) {
-        DashboardElements.filterListSistema.value = "";
+        if (!DashboardElements.filterListSistema.disabled) {
+          DashboardElements.filterListSistema.value = "";
+        }
+      }
+      if (DashboardElements.filterLancada) {
+        DashboardElements.filterLancada.value = "";
       }
       if (DashboardElements.filterFalhas) {
         DashboardElements.filterFalhas.value = "";
@@ -581,16 +595,12 @@
 
     // ----- Listeners dos filtros globais -----
 
-    // 🔥 Ontime: além de atualizar o filtro, repopula Montadora
-    //    (global) e Sistema (da lista) — ambos cascateiam do Ontime.
     if (DashboardElements.filterOntime) {
       DashboardElements.filterOntime.addEventListener("change", function () {
         ScriptState.filters.ontime = this.value;
-
-        // Repopula as opções cascateadas ANTES de aplicar os filtros
         refreshMontadoraOptions();
         refreshListSistemaOptions();
-
+        syncListSistemaDisabledState();
         applyFilters();
       });
     }
@@ -615,17 +625,20 @@
       );
     }
 
+    // Sistema global: ao mudar, o filtro da lista é
+    // desabilitado/resetado ou reabilitado
     if (DashboardElements.filterSistema) {
       DashboardElements.filterSistema.addEventListener(
         "change",
         function () {
           ScriptState.filters.sistema = this.value;
+          syncListSistemaDisabledState();
           applyFilters();
         },
       );
     }
 
-    // ----- 🔥 Listeners dos filtros exclusivos da lista -----
+    // ----- Listeners dos filtros exclusivos da lista -----
 
     if (DashboardElements.filterSegmento) {
       DashboardElements.filterSegmento.addEventListener(
@@ -641,7 +654,19 @@
       DashboardElements.filterListSistema.addEventListener(
         "change",
         function () {
+          // Se estiver desabilitado, não faz nada (defensivo)
+          if (this.disabled) return;
           ScriptState.filters.listSistema = this.value;
+          applyFilters();
+        },
+      );
+    }
+
+    if (DashboardElements.filterLancada) {
+      DashboardElements.filterLancada.addEventListener(
+        "change",
+        function () {
+          ScriptState.filters.lancada = this.value;
           applyFilters();
         },
       );
@@ -657,7 +682,6 @@
       );
     }
 
-    // ----- Botão "Limpar filtros" (globais) -----
     if (DashboardElements.btnClearFilters) {
       DashboardElements.btnClearFilters.addEventListener(
         "click",
@@ -668,7 +692,6 @@
       );
     }
 
-    // ----- 🔥 Botão "Limpar" (filtros da lista) -----
     if (DashboardElements.btnClearListFilters) {
       DashboardElements.btnClearListFilters.addEventListener(
         "click",

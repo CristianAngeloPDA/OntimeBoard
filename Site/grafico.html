@@ -24,7 +24,7 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- 🔥 Plugin de DataLabels -->
+    <!-- Plugin de DataLabels -->
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 
     <!-- SheetJS -->
@@ -163,7 +163,7 @@
               </button>
             </div>
 
-            <!-- 🔥 Banner de filtros ativos -->
+            <!-- Banner de filtros ativos (fora da barra, entre filtros e cards) -->
             <div class="filters-active-banner" id="filtersActiveBadge">
               <span class="filters-active-dot"></span>
               <i class="fas fa-filter"></i>
@@ -295,6 +295,7 @@
                   <p id="dsdListSubtitle">Aguardando dados…</p>
                 </div>
 
+                <!-- Filtros exclusivos da lista -->
                 <div class="dsd-list-filters">
                   <div class="filter-group list-only">
                     <label for="filterSegmento">
@@ -313,6 +314,16 @@
                     </label>
                     <select id="filterListSistema">
                       <option value="">Todos</option>
+                    </select>
+                  </div>
+
+                  <div class="filter-group list-only">
+                    <label for="filterLancada">
+                      <i class="fas fa-upload"></i>
+                      Lançada
+                    </label>
+                    <select id="filterLancada">
+                      <option value="">Todas</option>
                     </select>
                   </div>
 
@@ -357,11 +368,11 @@
     </div>
 
     <!-- JavaScripts -->
-    <script src="JavaScript/Errormodal.js"></script>
+    <script src="JavaScript/ErrorModal.js"></script>
     <script src="JavaScript/LoadingModal.js"></script>
     <script src="JavaScript/Estrutura.js"></script>
     <script src="JavaScript/Dados.js"></script>
     <script src="JavaScript/Graficos.js"></script>
-    <script src="JavaScript/script.js"></script>
+    <script src="JavaScript/Script.js"></script>
   </body>
 </html>
