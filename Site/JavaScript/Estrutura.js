@@ -9,16 +9,19 @@
  * - Manipulação de elementos DOM
  * - Gerenciamento de arquivos no menu
  *
- * 🔥 OTIMIZAÇÃO:
+ * OTIMIZAÇÃO:
  * - Ao invés de guardar o Excel em base64 e re-parsear no dashboard,
  *   parseia AGORA (na tela de upload) e guarda as linhas em `rawData`.
  *   No dashboard, processExcelFile() detecta o cache e pula XLSX.read.
  *
- * 🔥 NOVO:
+ * VALIDAÇÃO:
  * - Modal de processamento (LoadingModal) exibido durante o upload.
  * - Modal de erro (ErrorModal) exibido quando a planilha é
  *   incompatível. Nesse caso o arquivo NÃO é salvo e o usuário
  *   permanece na tela de upload (index.html).
+ * - `buildErrorDetails()` usa o objeto estruturado `.details`
+ *   fornecido pelo Dados.js para exibir as colunas ausentes e a
+ *   lista completa de colunas necessárias.
  */
 
 (function () {
@@ -360,55 +363,63 @@
   }
 
   /**
-   * Monta a lista de detalhes para o modal de erro a partir da
-   * mensagem lançada pelo `Dados.js`.
+   * Monta a lista de detalhes para o modal de erro.
+   *
+   * Formato simples, sem emojis: lista as colunas ausentes e,
+   * se o Dados.js tiver a lista completa, mostra também quais
+   * colunas o sistema espera (para o usuário comparar).
    */
-  function buildErrorDetails(errorMessage) {
+  function buildErrorDetails(error) {
     const details = [];
-    const msg = String(errorMessage || "");
+    const detailsObj = error && error.details;
+    const msg = String((error && error.message) || error || "");
 
-    // "Colunas não encontradas na planilha: X, Y, Z. Verifique..."
-    const missingMatch = msg.match(
-      /Colunas não encontradas na planilha:\s*(.+?)\./i,
-    );
-    if (missingMatch && missingMatch[1]) {
-      const missing = missingMatch[1]
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      details.push(
-        `Colunas obrigatórias ausentes: ${missing.join(" • ")}`,
-      );
-      details.push(
-        "Os nomes dos cabeçalhos precisam ser iguais aos do modelo (não importa maiúsculas/minúsculas nem acentos).",
-      );
-      return details;
+    // 1) Colunas ausentes
+    let missing = [];
+
+    if (detailsObj && Array.isArray(detailsObj.missing)) {
+      missing = detailsObj.missing;
+    } else {
+      // Fallback: extrai do texto do erro
+      const m = msg.match(/Colunas não encontradas na planilha:\s*(.+?)\./i);
+      if (m && m[1]) {
+        missing = m[1]
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
     }
 
-    if (/não contém dados suficientes/i.test(msg)) {
-      details.push(
-        "A planilha está vazia ou contém apenas a linha de cabeçalho.",
-      );
-      details.push("Adicione pelo menos uma linha de dados e tente novamente.");
-      return details;
+    if (missing.length > 0) {
+      details.push(`Colunas ausentes na planilha: ${missing.join(", ")}.`);
     }
 
-    if (/não contém nenhuma aba/i.test(msg)) {
-      details.push("O arquivo não possui nenhuma aba válida.");
-      return details;
+    // 2) Lista de todas as colunas esperadas
+    const Dados = window.OntimeBoard && window.OntimeBoard.Dados;
+    if (Dados && typeof Dados.getExpectedColumns === "function") {
+      const expected = Dados.getExpectedColumns();
+      details.push(`Colunas necessárias: ${expected.join(", ")}.`);
     }
 
-    if (/nenhuma linha de carga/i.test(msg)) {
-      details.push(
-        "A planilha foi lida, mas nenhuma linha possui a DESCRIÇÃO DSD preenchida.",
-      );
-      return details;
+    // 3) Mensagens específicas para outros tipos de erro
+    if (details.length === 0) {
+      if (/não contém dados suficientes/i.test(msg)) {
+        details.push(
+          "A planilha está vazia ou contém apenas a linha de cabeçalho.",
+        );
+      } else if (/não contém nenhuma aba/i.test(msg)) {
+        details.push("O arquivo não possui nenhuma aba válida.");
+      } else if (/Nenhuma linha de carga/i.test(msg)) {
+        details.push(
+          "A planilha foi lida, mas nenhuma linha possui a DESCRIÇÃO DSD preenchida.",
+        );
+      } else {
+        details.push(
+          "Confirme que o arquivo é a planilha de análise de cargas e que não está corrompido.",
+        );
+      }
     }
 
-    // Fallback genérico
-    details.push(
-      "Confirme que o arquivo é a planilha de análise de cargas e que não está corrompido.",
-    );
     return details;
   }
 
@@ -491,13 +502,13 @@
       const t1 = performance.now();
 
       console.log(
-        `[Upload] ⚡ Pré-processado: ${rawData.length} linha(s) em ${(t1 - t0).toFixed(0)}ms`,
+        `[Upload] Pré-processado: ${rawData.length} linha(s) em ${(t1 - t0).toFixed(0)}ms`,
       );
       setProgress(78);
     } catch (error) {
       console.warn("[Upload] Planilha incompatível:", error.message);
 
-      // 🔥 Fecha o loading e mostra o modal de erro.
+      // Fecha o loading e mostra o modal de erro.
       // NÃO salva o arquivo, NÃO redireciona — usuário permanece no index.
       hideLoading();
 
@@ -505,9 +516,9 @@
         ErrorModal.show({
           title: "Planilha incompatível",
           message:
-            "O arquivo enviado não segue o formato esperado pelo OntimeBoard. Certifique-se de que a planilha contém todas as colunas obrigatórias com os nomes exatos do modelo.",
+            "O arquivo enviado não segue o formato esperado pelo OntimeBoard. A planilha precisa conter todas as colunas listadas abaixo, com os nomes exatamente iguais aos do modelo (letras maiúsculas/minúsculas e acentos são ignorados).",
           fileName: file.name,
-          details: buildErrorDetails(error.message),
+          details: buildErrorDetails(error),
         });
       } else {
         alert(`Planilha incompatível:\n\n${error.message}`);

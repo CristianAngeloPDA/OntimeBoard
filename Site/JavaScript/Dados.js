@@ -5,11 +5,10 @@
  * - Leitura do arquivo Excel (SheetJS)
  * - Processamento/transformação dos dados brutos extraídos da planilha
  *
- * 🔥 OTIMIZAÇÃO:
- * - parseExcelArrayBuffer() -> parseia do ArrayBuffer (mais rápido que base64)
- * - parseExcelBase64()      -> fallback para arquivos antigos em sessionStorage
- * - processExcelFile()      -> usa cache (rawData) quando disponível,
- *                              evitando re-parse a cada reload
+ * Validação:
+ * - Todas as colunas usadas pelos filtros, gráficos, cards e lista
+ *   são OBRIGATÓRIAS. Se qualquer uma estiver ausente, o erro lista
+ *   os nomes faltantes para o modal de erro exibir ao usuário.
  */
 
 (function () {
@@ -36,13 +35,23 @@
     LANÇADA: "lancada",
   };
 
+  // Todas as colunas que o app realmente lê (filtros, gráficos,
+  // cards e lista). Se qualquer uma faltar, a planilha é rejeitada.
+  const REQUIRED_COLUMNS = [
+    "descricao", // DESCRIÇÃO DSD  -> lista de cargas
+    "tipoDev",   // TIPO DEV       -> filtros, gráficos, cards
+    "segmento",  // SEGMENTO       -> filtros, gráficos
+    "sistema",   // SISTEMA        -> filtros
+    "montadora", // MONTADORA      -> filtros
+    "falhas",    // FALHAS         -> filtro, gráfico de falhas
+    "aprovada",  // APROVADA       -> card "Reprovadas"
+    "ontime",    // ONTIME         -> filtro
+  ];
+
   // ============================================
-  // 2. PARSING DO EXCEL (compartilhado)
+  // 2. PARSING DO EXCEL
   // ============================================
 
-  /**
-   * Normaliza texto de cabeçalho (tolerante a caixa, espaços e acentos)
-   */
   function normalizeHeader(h) {
     return String(h || "")
       .trim()
@@ -52,16 +61,28 @@
   }
 
   /**
-   * Converte um workbook SheetJS já lido em um array de objetos
-   * { descricao, tipoDev, segmento, sistema, ... }
-   *
-   * @param {Object} workbook - resultado de XLSX.read()
-   * @returns {Array<Object>} linhas parseadas
+   * Dado o nome interno de uma coluna (ex.: "descricao"),
+   * devolve o nome legível do cabeçalho (ex.: "DESCRIÇÃO DSD").
+   */
+  function keyToSheetName(key) {
+    const found = Object.keys(COLUMN_MAP).find(
+      (sheetName) => COLUMN_MAP[sheetName] === key,
+    );
+    return found || key;
+  }
+
+  /**
+   * Converte um workbook SheetJS já lido em um array de objetos.
+   * Lança Error com `.code = "INCOMPATIBLE_SHEET"` e `.details`
+   * quando a planilha não tem todas as colunas obrigatórias.
    */
   function _workbookToJsonData(workbook) {
     const sheetName = workbook.SheetNames[0];
     if (!sheetName) {
-      throw new Error("A planilha não contém nenhuma aba.");
+      const err = new Error("A planilha não contém nenhuma aba.");
+      err.code = "INCOMPATIBLE_SHEET";
+      err.details = { missing: [] };
+      throw err;
     }
     const sheet = workbook.Sheets[sheetName];
 
@@ -71,13 +92,15 @@
     });
 
     if (!rows || rows.length < 2) {
-      throw new Error("A planilha não contém dados suficientes.");
+      const err = new Error("A planilha não contém dados suficientes.");
+      err.code = "INCOMPATIBLE_SHEET";
+      err.details = { missing: [] };
+      throw err;
     }
 
     const headerRowNormalized = rows[0].map(normalizeHeader);
     const dataRows = rows.slice(1);
 
-    // Mapeia cada coluna esperada ao índice real na planilha
     const colIndex = {};
     Object.keys(COLUMN_MAP).forEach((sheetColumnName) => {
       colIndex[COLUMN_MAP[sheetColumnName]] = headerRowNormalized.indexOf(
@@ -85,19 +108,22 @@
       );
     });
 
-    // Valida colunas obrigatórias
-    const REQUIRED_COLUMNS = ["descricao", "tipoDev", "segmento", "falhas"];
+    // Valida TODAS as colunas exigidas
     const missing = REQUIRED_COLUMNS.filter((key) => colIndex[key] === -1);
+
     if (missing.length > 0) {
-      const missingNames = Object.keys(COLUMN_MAP).filter((name) =>
-        missing.includes(COLUMN_MAP[name]),
+      const missingSheetNames = missing.map(keyToSheetName);
+      const err = new Error(
+        `Colunas não encontradas na planilha: ${missingSheetNames.join(", ")}. Verifique se o arquivo segue o layout esperado (mesmos nomes de cabeçalho da planilha modelo).`,
       );
-      throw new Error(
-        `Colunas não encontradas na planilha: ${missingNames.join(", ")}. Verifique se o arquivo segue o layout esperado (mesmos nomes de cabeçalho da planilha modelo).`,
-      );
+      err.code = "INCOMPATIBLE_SHEET";
+      err.details = {
+        missing: missingSheetNames,
+      };
+      throw err;
     }
 
-    return dataRows
+    const parsed = dataRows
       .map((row) => {
         const record = {};
         Object.keys(colIndex).forEach((key) => {
@@ -107,39 +133,25 @@
         return record;
       })
       .filter((record) => record.descricao !== "");
+
+    if (parsed.length === 0) {
+      const err = new Error(
+        "Nenhuma linha de carga foi encontrada na planilha.",
+      );
+      err.code = "INCOMPATIBLE_SHEET";
+      err.details = { missing: [] };
+      throw err;
+    }
+
+    return parsed;
   }
 
-  /**
-   * 🔥 OTIMIZAÇÃO: parseia Excel a partir de ArrayBuffer.
-   * Caminho preferido — evita todo o overhead de base64.
-   *
-   * @param {ArrayBuffer} arrayBuffer
-   * @returns {Array<Object>} linhas parseadas
-   */
   function parseExcelArrayBuffer(arrayBuffer) {
     if (!arrayBuffer) {
       throw new Error("ArrayBuffer inválido.");
     }
     const workbook = XLSX.read(arrayBuffer, {
       type: "array",
-      dense: true, // 🔥 mais rápido e menor uso de memória
-    });
-    return _workbookToJsonData(workbook);
-  }
-
-  /**
-   * Fallback: parseia Excel a partir de base64.
-   * Usado apenas para arquivos antigos que já estão em sessionStorage.
-   *
-   * @param {string} base64
-   * @returns {Array<Object>} linhas parseadas
-   */
-  function parseExcelBase64(base64) {
-    if (!base64) {
-      throw new Error("base64 inválido.");
-    }
-    const workbook = XLSX.read(base64, {
-      type: "base64",
       dense: true,
     });
     return _workbookToJsonData(workbook);
@@ -149,15 +161,6 @@
   // 3. PROCESSAMENTO PRINCIPAL
   // ============================================
 
-  /**
-   * Lê o arquivo Excel e retorna os dados processados.
-   *
-   * 🔥 OTIMIZAÇÃO: se `fileRecord.rawData` já existir (foi pré-processado
-   * na tela de upload), pula o XLSX.read completamente.
-   *
-   * @param {{name: string, base64?: string, rawData?: Array}} fileRecord
-   * @returns {Promise<Object>}
-   */
   function processExcelFile(fileRecord) {
     return new Promise((resolve, reject) => {
       try {
@@ -167,18 +170,13 @@
 
         let jsonData;
 
-        // 🔥 CACHE HIT: pula XLSX.read inteiro
         if (Array.isArray(fileRecord.rawData) && fileRecord.rawData.length > 0) {
           console.log(
-            `[SheetJS] ⚡ Cache hit — usando ${fileRecord.rawData.length} linha(s) já parseada(s)`,
+            `[SheetJS] Cache hit — usando ${fileRecord.rawData.length} linha(s) já parseada(s)`,
           );
           jsonData = fileRecord.rawData;
-        } else if (fileRecord.base64) {
-          // Fallback: arquivo antigo sem cache
-          console.log("[SheetJS] Cache miss — parseando base64 (fallback)");
-          jsonData = parseExcelBase64(fileRecord.base64);
         } else {
-          throw new Error("Arquivo sem conteúdo (nem rawData nem base64).");
+          throw new Error("Arquivo sem conteúdo (rawData ausente).");
         }
 
         resolve(processData(jsonData));
@@ -189,15 +187,11 @@
     });
   }
 
-  /**
-   * Processa os dados brutos e devolve totais + contagens para os gráficos.
-   */
   function processData(rawData) {
     console.log("[Processar] Linhas recebidas:", rawData.length);
 
     const normalize = (value) => (value || "").toString().trim().toUpperCase();
 
-    // ----- Cards -----
     const totalCargas = rawData.length;
 
     const novosSistemas = rawData.filter(
@@ -217,7 +211,6 @@
       (r) => normalize(r.aprovada) === "REPROVADA",
     ).length;
 
-    // ----- Contagem genérica por valor de uma coluna -----
     function countBy(field) {
       const counts = {};
       rawData.forEach((r) => {
@@ -252,9 +245,6 @@
     };
   }
 
-  /**
-   * Retorna valores únicos (não vazios, ordenados) de uma coluna.
-   */
   function getDistinctValues(rawData, field) {
     const set = new Set();
     (rawData || []).forEach((r) => {
@@ -272,8 +262,12 @@
     processExcelFile,
     processData,
     getDistinctValues,
-    parseExcelArrayBuffer, // 🔥 NOVO — usado pela Estrutura
-    parseExcelBase64, // 🔥 NOVO — fallback
+    parseExcelArrayBuffer,
+
+    /** Devolve a lista de colunas esperadas (nomes do cabeçalho) */
+    getExpectedColumns: function () {
+      return REQUIRED_COLUMNS.map(keyToSheetName);
+    },
 
     init: function () {
       console.log("✅ Dados inicializado");
