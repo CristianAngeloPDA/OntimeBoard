@@ -72,8 +72,6 @@ body {
   min-width: 44px;
 }
 
-/* Espaçador invisível para equilibrar a navbar quando o lado
-   direito não tem botões visíveis */
 .navbar-spacer {
   width: 44px;
 }
@@ -85,15 +83,17 @@ body {
   color: #0b2b4a;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
-.logo i {
-  color: #2a7de1;
-  font-size: 1.6rem;
+/* Logo (imagem) dentro do navbar */
+.logo-img {
+  height: 42px;
+  width: auto;
+  display: block;
+  object-fit: contain;
 }
 
-/* Botão hambúrguer */
 .menu-toggle {
   background: transparent;
   border: none;
@@ -232,7 +232,6 @@ body {
   margin-right: 8px;
 }
 
-/* Contador de arquivos no cabeçalho do menu */
 .file-count {
   font-size: 0.7rem;
   color: #889bb0;
@@ -491,7 +490,6 @@ body {
   margin-bottom: 4px;
 }
 
-/* Dica pequena abaixo da instrução principal */
 .upload-hint-note {
   font-size: 0.8rem;
   color: #6f8aa5;
@@ -532,7 +530,6 @@ body {
   outline-offset: 2px;
 }
 
-/* Input file escondido (acionado via botão) */
 .file-input-hidden {
   display: none;
 }
@@ -601,8 +598,8 @@ body {
     font-size: 1.25rem;
   }
 
-  .logo i {
-    font-size: 1.35rem;
+  .logo-img {
+    height: 34px;
   }
 
   .app-wrapper {
