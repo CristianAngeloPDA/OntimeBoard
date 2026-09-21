@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>OntimeBoard · Upload</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Font Awesome 6 -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- SheetJS -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <!-- ===== NAVBAR ===== -->
+    <nav class="navbar">
+      <div class="navbar-left">
+        <button class="menu-toggle" aria-label="Abrir menu" id="hamburgerBtn">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+
+      <div class="navbar-center">
+        <div class="logo">
+          <i class="fas fa-chart-pie"></i>
+          OntimeBoard
+        </div>
+      </div>
+
+      <div class="navbar-right">
+        <div class="navbar-spacer"></div>
+      </div>
+    </nav>
+
+    <!-- ===== OVERLAY ===== -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- ===== WRAPPER ===== -->
+    <div class="app-wrapper">
+      <!-- ===== MENU LATERAL ===== -->
+      <aside class="sidebar" id="sidebar">
+        <div class="menu-nav">
+          <button class="menu-home-btn" id="menuHomeBtn">
+            <i class="fas fa-home"></i>
+            Início
+          </button>
+        </div>
+
+        <div class="sidebar-header">
+          <span>
+            <i class="fas fa-folder-open"></i>
+            Arquivos
+          </span>
+          <span id="fileCount" class="file-count">0 arquivos</span>
+        </div>
+
+        <div id="menuItems" class="menu-items-container">
+          <div class="empty-state">
+            <i class="fas fa-inbox"></i>
+            <p>Nenhum arquivo carregado</p>
+            <span>Importe um arquivo Excel para começar</span>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <span><i class="far fa-circle"></i> <span id="totalFiles">0</span> arquivos</span>
+          <span><i class="far fa-hdd"></i> <span id="totalSize">0</span> MB</span>
+        </div>
+      </aside>
+
+      <!-- ===== CONTEÚDO PRINCIPAL ===== -->
+      <main class="main-content" id="mainContent">
+        <div id="contentContainer">
+          <!-- TELA DE UPLOAD -->
+          <div id="uploadScreen" class="upload-screen">
+            <div class="upload-card">
+              <div class="upload-icon">
+                <i class="fas fa-file-excel"></i>
+              </div>
+
+              <h2>Importar arquivo Excel</h2>
+
+              <p>
+                Arraste ou selecione um arquivo .xlsx ou .xls para iniciar a
+                análise.
+              </p>
+
+              <div class="upload-zone" id="uploadZone">
+                <div class="file-hint">
+                  <i class="fas fa-cloud-upload-alt"></i>
+
+                  <span>
+                    <strong>Selecione um arquivo</strong>
+                    ou arraste até aqui
+                  </span>
+
+                  <span class="upload-hint-note">XLSX, XLS até 10MB</span>
+                </div>
+              </div>
+
+              <button class="btn-select" id="uploadBtn">
+                <i class="fas fa-folder-open"></i>
+                Selecionar arquivo
+              </button>
+
+              <input
+                type="file"
+                id="fileInput"
+                accept=".xlsx,.xls"
+                class="file-input-hidden"
+              />
+
+              <div class="upload-footer">
+                <span>
+                  <i class="fas fa-table"></i>
+                  SheetJS
+                </span>
+                <span>
+                  <i class="fas fa-chart-line"></i>
+                  Chart.js
+                </span>
+                <span>
+                  <i class="fas fa-database"></i>
+                  Dashboard
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- JavaScripts -->
+    <script src="JavaScript/ErrorModal.js"></script>
+    <script src="JavaScript/LoadingModal.js"></script>
+    <script src="JavaScript/Estrutura.js"></script>
+    <script src="JavaScript/Dados.js"></script>
+    <script src="JavaScript/Graficos.js"></script>
+    <script src="JavaScript/Script.js"></script>
+  </body>
+</html>

@@ -1,0 +1,663 @@
+/* =========================================================
+   ONTIMEBOARD · STYLE.CSS
+   ---------------------------------------------------------
+   Usado APENAS pela tela de upload (index.html).
+   ========================================================= */
+
+
+/* =========================================================
+   1. RESET & BASE
+   ========================================================= */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: "Inter", sans-serif;
+  background: #f6f9fc;
+  color: #1a2634;
+  height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
+/* =========================================================
+   2. NAVBAR
+   ========================================================= */
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 68px;
+  background: #ffffff;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.04),
+    0 1px 2px rgba(0, 0, 0, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  z-index: 1000;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 44px;
+}
+
+.navbar-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 44px;
+}
+
+/* Espaçador invisível para equilibrar a navbar quando o lado
+   direito não tem botões visíveis */
+.navbar-spacer {
+  width: 44px;
+}
+
+.logo {
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: -0.4px;
+  color: #0b2b4a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.logo i {
+  color: #2a7de1;
+  font-size: 1.6rem;
+}
+
+/* Botão hambúrguer */
+.menu-toggle {
+  background: transparent;
+  border: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 30px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 6px;
+  border: 1px solid transparent;
+}
+
+.menu-toggle:hover {
+  background: #f0f4fa;
+  border-color: #dce3ec;
+}
+
+.menu-toggle span {
+  display: block;
+  width: 24px;
+  height: 2.5px;
+  background: #1f2a3a;
+  border-radius: 6px;
+  transition: 0.2s;
+}
+
+.menu-toggle span:nth-child(2) {
+  width: 18px;
+  align-self: flex-end;
+}
+
+.menu-toggle span:nth-child(3) {
+  width: 22px;
+  align-self: flex-start;
+}
+
+
+/* =========================================================
+   3. LAYOUT PRINCIPAL
+   ========================================================= */
+.app-wrapper {
+  display: flex;
+  margin-top: 68px;
+  height: calc(100vh - 68px);
+  position: relative;
+  overflow: hidden;
+}
+
+
+/* =========================================================
+   4. MENU LATERAL (SIDEBAR)
+   ========================================================= */
+.sidebar {
+  position: fixed;
+  top: 68px;
+  left: -320px;
+  width: 300px;
+  height: calc(100vh - 68px);
+  background: #ffffff;
+  border-right: 1px solid #e6edf4;
+  box-shadow: 6px 0 24px rgba(0, 0, 0, 0.06);
+  padding: 20px 18px;
+  overflow-y: auto;
+  transition: left 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sidebar.open {
+  left: 0;
+}
+
+.menu-nav {
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eef2f8;
+  margin-bottom: 6px;
+}
+
+.menu-home-btn {
+  width: 100%;
+  padding: 10px 16px;
+  background: #f0f7ff;
+  border: 1px solid #dce8f5;
+  border-radius: 12px;
+  color: #1a3a5f;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: "Inter", sans-serif;
+}
+
+.menu-home-btn:hover {
+  background: #e3edfc;
+  border-color: #2a7de1;
+  transform: scale(1.02);
+}
+
+.menu-home-btn i {
+  font-size: 1rem;
+  color: #2a7de1;
+}
+
+.menu-home-btn:focus {
+  outline: 2px solid #2a7de1;
+  outline-offset: 2px;
+}
+
+.sidebar-header {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  color: #6b7c8f;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eef2f8;
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.sidebar-header i {
+  font-size: 0.9rem;
+  color: #889bb0;
+  margin-right: 8px;
+}
+
+/* Contador de arquivos no cabeçalho do menu */
+.file-count {
+  font-size: 0.7rem;
+  color: #889bb0;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.menu-items-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 100px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #889bb0;
+  text-align: center;
+  gap: 8px;
+}
+
+.empty-state i {
+  font-size: 2.5rem;
+  color: #c8d6e5;
+  margin-bottom: 8px;
+}
+
+.empty-state p {
+  font-weight: 500;
+  color: #6b7c8f;
+  font-size: 0.95rem;
+}
+
+.empty-state span {
+  font-size: 0.8rem;
+  color: #a0b3c5;
+}
+
+.menu-item {
+  padding: 10px 18px;
+  font-size: 0.9rem;
+  color: #1f3347;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-left: 3px solid transparent;
+  transition: background 0.15s;
+  cursor: pointer;
+  border-radius: 0 20px 20px 0;
+  position: relative;
+  animation: slideIn 0.3s ease;
+}
+
+.menu-item i {
+  color: #4c7aa3;
+  font-size: 0.9rem;
+  width: 18px;
+  text-align: center;
+}
+
+.menu-item:hover {
+  background: #ecf3fc;
+  border-left-color: #2a7de1;
+}
+
+.menu-item.active {
+  background: #e3edfc;
+  border-left-color: #1a6bd0;
+  font-weight: 500;
+}
+
+.menu-item:not(:last-child) {
+  border-bottom: 1px solid #f0f5fb;
+}
+
+.delete-btn {
+  background: transparent;
+  border: none;
+  color: #b0c4d8;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.menu-item:hover .delete-btn {
+  opacity: 1;
+}
+
+.delete-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  font-size: 0.75rem;
+  color: #8d9eb0;
+  padding-top: 16px;
+  border-top: 1px solid #eef2f8;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-start;
+}
+
+.sidebar-footer i {
+  margin-right: 4px;
+}
+
+
+/* =========================================================
+   5. OVERLAY
+   ========================================================= */
+.overlay {
+  position: fixed;
+  top: 68px;
+  left: 0;
+  width: 100%;
+  height: calc(100vh - 68px);
+  background: rgba(12, 22, 35, 0.45);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.3s ease,
+    visibility 0.3s ease;
+  z-index: 1100;
+  pointer-events: none;
+}
+
+.overlay.active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+
+/* =========================================================
+   6. CONTEÚDO PRINCIPAL
+   ========================================================= */
+.main-content {
+  flex: 1;
+  padding: 32px 40px;
+  overflow-y: auto;
+  background: #f6f9fc;
+}
+
+#contentContainer {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+
+/* =========================================================
+   7. TELA DE UPLOAD
+   ========================================================= */
+.upload-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+}
+
+.upload-card {
+  max-width: 640px;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 32px;
+  padding: 48px 44px 44px 44px;
+  box-shadow:
+    0 12px 40px rgba(0, 20, 40, 0.06),
+    0 4px 12px rgba(0, 0, 0, 0.02);
+  border: 1px solid #e8eef6;
+  text-align: center;
+}
+
+.upload-icon {
+  font-size: 3.4rem;
+  color: #1d6f42;
+  background: #e5f3e9;
+  width: 90px;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 60px;
+  margin: 0 auto 18px auto;
+}
+
+.upload-icon i {
+  filter: drop-shadow(0 4px 6px rgba(30, 100, 50, 0.12));
+}
+
+.upload-card h2 {
+  font-weight: 600;
+  font-size: 1.7rem;
+  letter-spacing: -0.3px;
+  color: #0c1f32;
+  margin-bottom: 10px;
+}
+
+.upload-card p {
+  color: #4f657b;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  max-width: 380px;
+  margin: 0 auto 28px auto;
+}
+
+.upload-zone {
+  border: 2px dashed #cbd8e8;
+  border-radius: 24px;
+  padding: 28px 20px;
+  background: #fafdff;
+  transition:
+    border 0.2s,
+    background 0.2s;
+  margin-bottom: 24px;
+  cursor: pointer;
+}
+
+.upload-zone:hover {
+  border-color: #2a7de1;
+  background: #f4f9ff;
+}
+
+.upload-zone.dragover {
+  border-color: #2a7de1;
+  background: #f0f7ff;
+  transform: scale(1.01);
+}
+
+.upload-zone .file-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: #3f5b77;
+  font-size: 0.9rem;
+}
+
+.upload-zone .file-hint i {
+  font-size: 2rem;
+  color: #567ea3;
+  margin-bottom: 4px;
+}
+
+/* Dica pequena abaixo da instrução principal */
+.upload-hint-note {
+  font-size: 0.8rem;
+  color: #6f8aa5;
+}
+
+.btn-select {
+  background: #1f3a5f;
+  color: white;
+  border: none;
+  font-weight: 500;
+  font-size: 1rem;
+  padding: 12px 32px;
+  border-radius: 60px;
+  cursor: pointer;
+  transition: 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 10px rgba(20, 50, 90, 0.08);
+}
+
+.btn-select i {
+  font-size: 1rem;
+}
+
+.btn-select:hover {
+  background: #143152;
+  box-shadow: 0 8px 18px rgba(20, 50, 90, 0.12);
+  transform: scale(1.01);
+}
+
+.btn-select:active {
+  transform: scale(0.97);
+}
+
+.btn-select:focus {
+  outline: 2px solid #2a7de1;
+  outline-offset: 2px;
+}
+
+/* Input file escondido (acionado via botão) */
+.file-input-hidden {
+  display: none;
+}
+
+.upload-footer {
+  margin-top: 16px;
+  font-size: 0.8rem;
+  color: #7a8fa3;
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+}
+
+.upload-footer i {
+  margin-right: 4px;
+}
+
+
+/* =========================================================
+   8. ANIMAÇÕES
+   ========================================================= */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+
+/* =========================================================
+   9. RESPONSIVIDADE
+   ========================================================= */
+
+@media (min-width: 1400px) {
+  .main-content {
+    padding: 36px 48px;
+  }
+  #contentContainer {
+    max-width: 1500px;
+  }
+}
+
+@media (max-width: 1199px) and (min-width: 901px) {
+  .main-content {
+    padding: 28px 32px;
+  }
+}
+
+@media (max-width: 900px) and (min-width: 701px) {
+  .main-content {
+    padding: 24px 24px;
+  }
+}
+
+@media (max-width: 700px) {
+  .navbar {
+    padding: 0 16px;
+    height: 60px;
+  }
+
+  .logo {
+    font-size: 1.25rem;
+  }
+
+  .logo i {
+    font-size: 1.35rem;
+  }
+
+  .app-wrapper {
+    margin-top: 60px;
+    height: calc(100vh - 60px);
+  }
+
+  .sidebar {
+    top: 60px;
+    width: 270px;
+    left: -290px;
+    height: calc(100vh - 60px);
+  }
+
+  .overlay {
+    top: 60px;
+    height: calc(100vh - 60px);
+  }
+
+  .main-content {
+    padding: 20px 16px;
+  }
+
+  .upload-card {
+    padding: 32px 20px;
+    border-radius: 24px;
+  }
+
+  .upload-card h2 {
+    font-size: 1.4rem;
+  }
+
+  .upload-icon {
+    width: 78px;
+    height: 78px;
+    font-size: 3rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .upload-card {
+    padding: 24px 16px;
+  }
+
+  .upload-icon {
+    width: 68px;
+    height: 68px;
+    font-size: 2.6rem;
+  }
+
+  .upload-card h2 {
+    font-size: 1.2rem;
+  }
+
+  .upload-card p {
+    font-size: 0.9rem;
+  }
+}

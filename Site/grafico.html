@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>OntimeBoard · Dashboard</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Font Awesome 6 -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- 🔥 Plugin de DataLabels -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+
+    <!-- SheetJS -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="dashboard.css" />
+  </head>
+
+  <body>
+    <!-- ===== NAVBAR ===== -->
+    <nav class="navbar">
+      <div class="navbar-left">
+        <button class="menu-toggle" aria-label="Abrir menu" id="hamburgerBtn">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+
+      <div class="navbar-center">
+        <div class="logo">
+          <i class="fas fa-chart-pie"></i>
+          OntimeBoard
+        </div>
+      </div>
+
+      <div class="navbar-right">
+        <div class="navbar-spacer"></div>
+      </div>
+    </nav>
+
+    <!-- ===== OVERLAY ===== -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- ===== WRAPPER ===== -->
+    <div class="app-wrapper">
+      <!-- ===== MENU LATERAL ===== -->
+      <aside class="sidebar" id="sidebar">
+        <div class="menu-nav">
+          <button class="menu-home-btn" id="menuHomeBtn">
+            <i class="fas fa-home"></i>
+            Início
+          </button>
+        </div>
+
+        <div class="sidebar-header">
+          <span>
+            <i class="fas fa-folder-open"></i>
+            Arquivos
+          </span>
+          <span id="fileCount" class="file-count">0 arquivos</span>
+        </div>
+
+        <div id="menuItems" class="menu-items-container">
+          <div class="empty-state">
+            <i class="fas fa-inbox"></i>
+            <p>Nenhum arquivo carregado</p>
+            <span>Importe um arquivo Excel para começar</span>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <span><i class="far fa-circle"></i> <span id="totalFiles">0</span> arquivos</span>
+          <span><i class="far fa-hdd"></i> <span id="totalSize">0</span> MB</span>
+        </div>
+      </aside>
+
+      <!-- ===== CONTEÚDO PRINCIPAL ===== -->
+      <main class="main-content" id="mainContent">
+        <div id="contentContainer">
+          <!-- TELA DE DASHBOARD -->
+          <div id="dashboardScreen" class="dashboard-screen">
+            <!-- ===== CABEÇALHO ===== -->
+            <div class="dashboard-header">
+              <div>
+                <h2 id="dashboardTitle">Dashboard</h2>
+                <p id="dashboardSubtitle">
+                  Selecione um arquivo no menu para visualizar os dados
+                </p>
+              </div>
+              <button class="btn-upload-new" id="btnUploadNew">
+                <i class="fas fa-plus"></i>
+                Novo arquivo
+              </button>
+            </div>
+
+            <!-- ===== BARRA DE FILTROS GLOBAIS ===== -->
+            <div class="filters-bar" id="filtersBar">
+              <div class="filter-group">
+                <label for="filterOntime">
+                  <i class="fas fa-calendar-alt"></i>
+                  Ontime
+                </label>
+                <select id="filterOntime">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <label for="filterMontadora">
+                  <i class="fas fa-industry"></i>
+                  Montadora
+                </label>
+                <select id="filterMontadora">
+                  <option value="">Todas</option>
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <label for="filterTipoDev">
+                  <i class="fas fa-tag"></i>
+                  Tipo Dev
+                </label>
+                <select id="filterTipoDev">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <label for="filterSistema">
+                  <i class="fas fa-cogs"></i>
+                  Sistema
+                </label>
+                <select id="filterSistema">
+                  <option value="">Todos</option>
+                  <option value="MOTOR">MOTOR</option>
+                  <option value="PÓS TRATAMENTO">PÓS TRATAMENTO</option>
+                  <option value="FREIO">FREIO</option>
+                  <option value="TRANSMISSÃO">TRANSMISSÃO</option>
+                  <option value="CARROCERIA">CARROCERIA</option>
+                </select>
+              </div>
+
+              <button type="button" class="btn-clear-filters" id="btnClearFilters">
+                <i class="fas fa-times"></i>
+                Limpar filtros
+              </button>
+            </div>
+
+            <!-- 🔥 Banner de filtros ativos -->
+            <div class="filters-active-banner" id="filtersActiveBadge">
+              <span class="filters-active-dot"></span>
+              <i class="fas fa-filter"></i>
+              <span class="filters-active-text">
+                <strong>Filtros ativos</strong>
+                <span class="filters-active-hint">Os resultados abaixo refletem os filtros selecionados</span>
+              </span>
+            </div>
+
+            <!-- ===== CARDS DE ESTATÍSTICAS ===== -->
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-icon blue">
+                  <i class="fas fa-layer-group"></i>
+                </div>
+                <div class="stat-info">
+                  <span class="stat-label">Total de cargas</span>
+                  <span class="stat-value" id="totalSales">—</span>
+                </div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-icon green">
+                  <i class="fas fa-microchip"></i>
+                </div>
+                <div class="stat-info">
+                  <span class="stat-label">Novos sistemas</span>
+                  <span class="stat-value" id="totalRevenue">—</span>
+                </div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-icon orange">
+                  <i class="fas fa-plus-circle"></i>
+                </div>
+                <div class="stat-info">
+                  <span class="stat-label">Novas funções</span>
+                  <span class="stat-value" id="averageSale">—</span>
+                </div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-icon purple">
+                  <i class="fas fa-robot"></i>
+                </div>
+                <div class="stat-info">
+                  <span class="stat-label">Buscas automáticas</span>
+                  <span class="stat-value" id="buscasAutomaticas">—</span>
+                </div>
+              </div>
+
+              <div class="stat-card">
+                <div class="stat-icon red">
+                  <i class="fas fa-times-circle"></i>
+                </div>
+                <div class="stat-info">
+                  <span class="stat-label">Reprovadas</span>
+                  <span class="stat-value" id="reprovadas">—</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- ===== ÁREA DE GRÁFICOS ===== -->
+            <div class="charts-grid">
+              <div class="chart-card">
+                <div class="chart-header">
+                  <h3>Cargas por Segmento</h3>
+                  <span class="chart-badge">
+                    <i class="fas fa-chart-bar"></i>
+                    Coluna
+                  </span>
+                </div>
+                <div class="chart-container">
+                  <canvas id="barChart"></canvas>
+                  <div class="chart-placeholder" id="barPlaceholder">
+                    <i class="fas fa-chart-bar"></i>
+                    <p>Dados serão exibidos aqui</p>
+                    <span>Importe um arquivo para visualizar</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="chart-card">
+                <div class="chart-header">
+                  <h3>Cargas por Tipo Dev</h3>
+                  <span class="chart-badge">
+                    <i class="fas fa-chart-pie"></i>
+                    Pizza
+                  </span>
+                </div>
+                <div class="chart-container">
+                  <canvas id="pieChart"></canvas>
+                  <div class="chart-placeholder" id="piePlaceholder">
+                    <i class="fas fa-chart-pie"></i>
+                    <p>Dados serão exibidos aqui</p>
+                    <span>Importe um arquivo para visualizar</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="chart-card">
+                <div class="chart-header">
+                  <h3>Falhas (CF=1, CF&gt;1, SF)</h3>
+                  <span class="chart-badge">
+                    <i class="fas fa-chart-pie"></i>
+                    Pizza
+                  </span>
+                </div>
+                <div class="chart-container">
+                  <canvas id="lineChart"></canvas>
+                  <div class="chart-placeholder" id="linePlaceholder">
+                    <i class="fas fa-chart-pie"></i>
+                    <p>Dados serão exibidos aqui</p>
+                    <span>Importe um arquivo para visualizar</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- ===== LISTA DE CARGAS ===== -->
+            <div class="dsd-list-card">
+              <div class="dsd-list-header">
+                <div class="dsd-list-header-text">
+                  <h3>
+                    <i class="fas fa-list-ul"></i>
+                    Lista de cargas
+                    <span class="dsd-list-count" id="dsdListCount">0</span>
+                  </h3>
+                  <p id="dsdListSubtitle">Aguardando dados…</p>
+                </div>
+
+                <div class="dsd-list-filters">
+                  <div class="filter-group list-only">
+                    <label for="filterSegmento">
+                      <i class="fas fa-layer-group"></i>
+                      Segmento
+                    </label>
+                    <select id="filterSegmento">
+                      <option value="">Todos</option>
+                    </select>
+                  </div>
+
+                  <div class="filter-group list-only">
+                    <label for="filterListSistema">
+                      <i class="fas fa-cogs"></i>
+                      Sistema
+                    </label>
+                    <select id="filterListSistema">
+                      <option value="">Todos</option>
+                    </select>
+                  </div>
+
+                  <div class="filter-group list-only">
+                    <label for="filterFalhas">
+                      <i class="fas fa-exclamation-triangle"></i>
+                      Falhas
+                    </label>
+                    <select id="filterFalhas">
+                      <option value="">Todas</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    class="btn-clear-list-filters"
+                    id="btnClearListFilters"
+                    title="Limpar filtros da lista"
+                  >
+                    <i class="fas fa-times"></i>
+                    Limpar
+                  </button>
+                </div>
+              </div>
+
+              <div class="list-filters-banner">
+                <span class="list-filters-dot"></span>
+                <i class="fas fa-info-circle"></i>
+                <span class="list-filters-text">
+                  <strong>Filtros exclusivos da lista</strong>
+                  <span class="list-filters-hint">
+                    Estes filtros se aplicam somente à lista abaixo — não afetam os gráficos nem os cards
+                  </span>
+                </span>
+              </div>
+
+              <div class="dsd-list-container" id="dsdListContainer"></div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- JavaScripts -->
+    <script src="JavaScript/ErrorModal.js"></script>
+    <script src="JavaScript/LoadingModal.js"></script>
+    <script src="JavaScript/Estrutura.js"></script>
+    <script src="JavaScript/Dados.js"></script>
+    <script src="JavaScript/Graficos.js"></script>
+    <script src="JavaScript/Script.js"></script>
+  </body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "ontimeboard",
+  "version": "1.0.0",
+  "description": "Site desenvolvido por Cristian Angelo, Aplicação\r Funcionalidade: Enviar planilhas e transforma-las em gráficos visuais para análise das cargas a serem lançadas em cada ontime \r Site restrito e privado para uso da empresa Chiptronic",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "chart.js": "^4.5.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  }
+}
