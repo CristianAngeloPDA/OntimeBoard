@@ -10,18 +10,17 @@
  * - Gerenciamento de arquivos no menu
  *
  * OTIMIZAÇÃO:
- * - Ao invés de guardar o Excel em base64 e re-parsear no dashboard,
- *   parseia AGORA (na tela de upload) e guarda as linhas em `rawData`.
+ * - Parseia o Excel na tela de upload e guarda `rawData` em cache.
  *   No dashboard, processExcelFile() detecta o cache e pula XLSX.read.
  *
  * VALIDAÇÃO:
- * - Modal de processamento (LoadingModal) exibido durante o upload.
- * - Modal de erro (ErrorModal) exibido quando a planilha é
- *   incompatível. Nesse caso o arquivo NÃO é salvo e o usuário
- *   permanece na tela de upload (index.html).
- * - `buildErrorDetails()` usa o objeto estruturado `.details`
- *   fornecido pelo Dados.js para exibir as colunas ausentes e a
- *   lista completa de colunas necessárias.
+ * - Modal de processamento (LoadingModal) durante o upload.
+ * - Modal de erro (ErrorModal) quando a planilha é incompatível.
+ * - MODAL DE AVISO quando:
+ *     • o nome do arquivo já existe entre os carregados
+ *     • o conteúdo é idêntico ao de algum arquivo já carregado
+ *   Em ambos os casos, o arquivo NÃO é salvo e o usuário permanece
+ *   na tela de upload.
  */
 
 (function () {
@@ -363,24 +362,19 @@
   }
 
   /**
-   * Monta a lista de detalhes para o modal de erro.
-   *
-   * Formato simples, sem emojis: lista as colunas ausentes e,
-   * se o Dados.js tiver a lista completa, mostra também quais
-   * colunas o sistema espera (para o usuário comparar).
+   * Monta a lista de detalhes para o modal de erro de planilha
+   * incompatível (colunas ausentes).
    */
   function buildErrorDetails(error) {
     const details = [];
     const detailsObj = error && error.details;
     const msg = String((error && error.message) || error || "");
 
-    // 1) Colunas ausentes
     let missing = [];
 
     if (detailsObj && Array.isArray(detailsObj.missing)) {
       missing = detailsObj.missing;
     } else {
-      // Fallback: extrai do texto do erro
       const m = msg.match(/Colunas não encontradas na planilha:\s*(.+?)\./i);
       if (m && m[1]) {
         missing = m[1]
@@ -394,14 +388,12 @@
       details.push(`Colunas ausentes na planilha: ${missing.join(", ")}.`);
     }
 
-    // 2) Lista de todas as colunas esperadas
     const Dados = window.OntimeBoard && window.OntimeBoard.Dados;
     if (Dados && typeof Dados.getExpectedColumns === "function") {
       const expected = Dados.getExpectedColumns();
       details.push(`Colunas necessárias: ${expected.join(", ")}.`);
     }
 
-    // 3) Mensagens específicas para outros tipos de erro
     if (details.length === 0) {
       if (/não contém dados suficientes/i.test(msg)) {
         details.push(
@@ -424,13 +416,72 @@
   }
 
   /**
+   * Compara dois arrays de linhas (rawData) e devolve `true` se
+   * tiverem EXATAMENTE o mesmo conteúdo (mesmo número de linhas,
+   * mesmas chaves e valores em cada linha).
+   *
+   * A comparação é resistente à ordem das linhas: dois arquivos
+   * com as mesmas linhas em ordens diferentes são considerados
+   * iguais.
+   */
+  function areContentsIdentical(a, b) {
+    if (!Array.isArray(a) || !Array.isArray(b)) return false;
+    if (a.length !== b.length) return false;
+    if (a.length === 0) return false;
+
+    const serialize = (arr) =>
+      arr
+        .map((row) => JSON.stringify(row, Object.keys(row).sort()))
+        .sort()
+        .join("\n");
+
+    return serialize(a) === serialize(b);
+  }
+
+  /**
+   * Exibe o modal avisando que o arquivo já existe.
+   *
+   * @param {string} fileName           nome do arquivo que foi tentado
+   * @param {"name"|"content"} reason   motivo da rejeição
+   * @param {string} [existingName]     nome do arquivo já carregado
+   *                                    (usado quando reason = "content")
+   */
+  function showDuplicateWarning(fileName, reason, existingName) {
+    const ErrorModal = window.OntimeBoard && window.OntimeBoard.ErrorModal;
+    if (!ErrorModal) {
+      alert("Este arquivo já foi carregado!");
+      return;
+    }
+
+    const messageName =
+      "Já existe um arquivo carregado com este mesmo nome. Para enviá-lo novamente, exclua o arquivo existente pelo menu lateral primeiro.";
+
+    const messageContent =
+      "O conteúdo desta planilha é idêntico ao de um arquivo já carregado no sistema. Para enviá-la novamente, exclua o arquivo existente pelo menu lateral primeiro.";
+
+    const details = [];
+    if (reason === "content" && existingName) {
+      details.push(`Arquivo já carregado: ${existingName}`);
+      details.push(`Arquivo que você tentou enviar: ${fileName}`);
+    }
+
+    ErrorModal.show({
+      variant: "warning",
+      title: "Arquivo já carregado",
+      message: reason === "name" ? messageName : messageContent,
+      fileName: fileName,
+      details: details,
+    });
+  }
+
+  /**
    * Processa o arquivo escolhido pelo usuário.
    *
    * Fluxo:
    *  1. Lê o ArrayBuffer
    *  2. Parseia a planilha (valida colunas obrigatórias)
-   *  3. Se falhar → ErrorModal + permanece no index (NÃO salva)
-   *  4. Se suceder → salva, mostra "Tudo pronto" e redireciona
+   *  3. Valida se o conteúdo já não está carregado (duplicata)
+   *  4. Se tudo OK → salva, mostra "Tudo pronto" e redireciona
    */
   async function processFile(file) {
     const fileId = ++State.fileIdCounter;
@@ -469,6 +520,7 @@
 
       if (ErrorModal) {
         ErrorModal.show({
+          variant: "error",
           title: "Falha ao ler o arquivo",
           message:
             "Não foi possível acessar o conteúdo do arquivo selecionado. Verifique se ele não está corrompido ou protegido por senha.",
@@ -508,12 +560,11 @@
     } catch (error) {
       console.warn("[Upload] Planilha incompatível:", error.message);
 
-      // Fecha o loading e mostra o modal de erro.
-      // NÃO salva o arquivo, NÃO redireciona — usuário permanece no index.
       hideLoading();
 
       if (ErrorModal) {
         ErrorModal.show({
+          variant: "error",
           title: "Planilha incompatível",
           message:
             "O arquivo enviado não segue o formato esperado pelo OntimeBoard. A planilha precisa conter todas as colunas listadas abaixo, com os nomes exatamente iguais aos do modelo (letras maiúsculas/minúsculas e acentos são ignorados).",
@@ -526,9 +577,26 @@
       return;
     }
 
-    // ===== ETAPA 4: salvar (só chega aqui se o parse deu certo) =====
+    // ===== ETAPA 4: validação de CONTEÚDO duplicado =====
+    await nextTick(20);
+    setProgress(82);
+
+    const duplicate = State.uploadedFiles.find((f) =>
+      areContentsIdentical(f.rawData, rawData),
+    );
+
+    if (duplicate) {
+      console.warn(
+        `[Upload] Conteúdo idêntico ao arquivo já carregado: ${duplicate.name}`,
+      );
+      hideLoading();
+      showDuplicateWarning(file.name, "content", duplicate.name);
+      return;
+    }
+
+    // ===== ETAPA 5: salvar (só chega aqui se tudo deu certo) =====
     setStage(3);
-    setProgress(86);
+    setProgress(90);
     await nextTick(20);
 
     const fileRecord = {
@@ -553,7 +621,7 @@
     });
     document.dispatchEvent(uploadEvent);
 
-    // ===== ETAPA 5: finalização + redirecionamento =====
+    // ===== ETAPA 6: finalização + redirecionamento =====
     setStage(4);
     setProgress(100);
     await nextTick(700);
@@ -578,11 +646,14 @@
       return false;
     }
 
-    const exists = State.uploadedFiles.some(
-      (f) => f.name === file.name && f.size === file.size,
+    // Validação 1: nome do arquivo duplicado (rápida, antes de
+    // sequer ler/parsear o arquivo)
+    const nameExists = State.uploadedFiles.some(
+      (f) => f.name === file.name,
     );
-    if (exists) {
-      alert("Este arquivo já foi carregado!");
+    if (nameExists) {
+      console.log(`[Upload] Nome duplicado: ${file.name}`);
+      showDuplicateWarning(file.name, "name");
       return false;
     }
 

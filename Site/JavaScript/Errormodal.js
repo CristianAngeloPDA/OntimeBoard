@@ -1,12 +1,12 @@
 /**
- * OntimeBoard - Modal de Erro
+ * OntimeBoard - Modal de Erro/Aviso
  *
  * Módulo autossuficiente: injeta o próprio CSS e HTML e expõe
- * uma API simples para exibir erros fatais (ex.: planilha
- * incompatível) de forma clara e amigável.
+ * uma API simples para exibir erros ou avisos.
  *
  * Uso:
  *   ErrorModal.show({
+ *     variant:  "error" | "warning",   // padrão: "error"
  *     title:    "Planilha incompatível",
  *     message:  "O arquivo não segue o formato esperado.",
  *     fileName: "carga.xlsx",           // opcional
@@ -63,25 +63,35 @@
         transform: translateY(14px) scale(0.98);
         transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
         text-align: center;
-        border-top: 4px solid #c62828;
       }
       .error-modal-overlay.visible .error-modal {
         transform: translateY(0) scale(1);
       }
+
+      /* Variantes de cor da borda superior */
+      .error-modal.variant-error   { border-top: 4px solid #c62828; }
+      .error-modal.variant-warning { border-top: 4px solid #f57c00; }
 
       .error-modal-icon {
         width: 72px;
         height: 72px;
         margin: 0 auto 18px;
         border-radius: 50%;
-        background: #fdecea;
-        color: #c62828;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 2rem;
         animation: emShake 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97);
       }
+      .error-modal.variant-error   .error-modal-icon {
+        background: #fdecea;
+        color: #c62828;
+      }
+      .error-modal.variant-warning .error-modal-icon {
+        background: #fff3e0;
+        color: #f57c00;
+      }
+
       @keyframes emShake {
         10%, 90% { transform: translateX(-2px); }
         20%, 80% { transform: translateX(4px); }
@@ -107,14 +117,21 @@
       .error-modal-file {
         display: inline-block;
         font-size: 0.82rem;
-        color: #7a4a45;
-        background: #fdecea;
-        border: 1px solid #f3c6c6;
         padding: 6px 14px;
         border-radius: 20px;
         margin-bottom: 16px;
         max-width: 100%;
         word-break: break-word;
+      }
+      .error-modal.variant-error   .error-modal-file {
+        color: #7a4a45;
+        background: #fdecea;
+        border: 1px solid #f3c6c6;
+      }
+      .error-modal.variant-warning .error-modal-file {
+        color: #8a5a1a;
+        background: #fff3e0;
+        border: 1px solid #f3d9b8;
       }
 
       .error-modal-details {
@@ -146,11 +163,12 @@
         font-family: "Font Awesome 6 Free", "Font Awesome 5 Free", sans-serif;
         font-weight: 900;
         font-size: 0.5rem;
-        color: #c62828;
         position: absolute;
         left: 4px;
         top: 7px;
       }
+      .error-modal.variant-error   .error-modal-details li::before { color: #c62828; }
+      .error-modal.variant-warning .error-modal-details li::before { color: #f57c00; }
 
       .error-modal-btn {
         background: #1f3a5f;
@@ -182,20 +200,10 @@
       }
 
       @media (max-width: 480px) {
-        .error-modal {
-          padding: 28px 20px 22px;
-        }
-        .error-modal-icon {
-          width: 60px;
-          height: 60px;
-          font-size: 1.7rem;
-        }
-        .error-modal-title {
-          font-size: 1.15rem;
-        }
-        .error-modal-message {
-          font-size: 0.85rem;
-        }
+        .error-modal { padding: 28px 20px 22px; }
+        .error-modal-icon { width: 60px; height: 60px; font-size: 1.7rem; }
+        .error-modal-title { font-size: 1.15rem; }
+        .error-modal-message { font-size: 0.85rem; }
       }
     `;
     document.head.appendChild(style);
@@ -212,7 +220,7 @@
     overlay.id = "errorModalOverlay";
 
     overlay.innerHTML = `
-      <div class="error-modal" role="alertdialog" aria-modal="true" aria-labelledby="errorModalTitle">
+      <div class="error-modal variant-error" role="alertdialog" aria-modal="true" aria-labelledby="errorModalTitle">
         <div class="error-modal-icon">
           <i class="fas fa-exclamation-triangle"></i>
         </div>
@@ -236,12 +244,10 @@
         hide();
       });
 
-    // Fecha ao clicar fora
     overlay.addEventListener("click", function (e) {
       if (e.target === overlay) hide();
     });
 
-    // Fecha com ESC
     if (!keydownBound) {
       document.addEventListener("keydown", function (e) {
         if (
@@ -265,6 +271,12 @@
     opts = opts || {};
     injectCSS();
     const el = buildModal();
+    const card = el.querySelector(".error-modal");
+
+    // Variante (error | warning)
+    const variant = opts.variant === "warning" ? "warning" : "error";
+    card.classList.remove("variant-error", "variant-warning");
+    card.classList.add("variant-" + variant);
 
     const titleEl = el.querySelector("#errorModalTitle");
     const msgEl = el.querySelector("#errorModalMessage");
@@ -299,7 +311,6 @@
     el.classList.add("visible");
     document.body.style.overflow = "hidden";
 
-    // Foca o botão (acessibilidade)
     setTimeout(function () {
       const btn = el.querySelector("#errorModalBtn");
       if (btn) btn.focus();
