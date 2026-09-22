@@ -4,10 +4,10 @@
  * Recursos:
  * - filtros globais + filtros exclusivos da lista
  * - filtros cascateados (Montadora depende de Ontime + Tipo Dev)
- * - etiqueta "Lançada" / "Não Lançada"
+ * - etiqueta "Lançada" / "Não Lançada" e "Não informado" (falhas = \N)
  * - mensagem "sem resultado" quando os filtros zeram o dataset
  * - cliques na legenda dos gráficos de pizza filtram a lista DSD
- * - 🔥 Botões "Limpar filtros" / "Limpar" RESTAURAM também os itens
+ * - Botões "Limpar filtros" / "Limpar" RESTAURAM também os itens
  *   que foram ocultados clicando na legenda dos gráficos
  */
 
@@ -176,7 +176,6 @@
 
       ScriptState.isProcessing = true;
 
-      // Novo arquivo → limpa tudo (inclusive os itens ocultados na legenda)
       resetHiddenChartValues();
 
       Dados.processExcelFile(fileData)
@@ -217,6 +216,13 @@
     // 4.0.1 LISTA DE CARGAS (DESCRIÇÃO DSD)
     // ============================================
 
+    /**
+     * Renderiza a lista considerando apenas os valores específicos
+     * que foram ocultados clicando na legenda.
+     *
+     * Cargas com `falhas = "\N"` NÃO são afetadas por ocultar
+     * fatias do gráfico de Falhas — continuam visíveis.
+     */
     function renderDsdListWithChartFilters(listRaw) {
       const source = Array.isArray(listRaw) ? listRaw : [];
 
@@ -270,7 +276,7 @@
         meta.className = "dsd-list-item-meta";
 
         const addBadge = (text, cls, icon) => {
-          if (!text || text === "\\N") return;
+          if (!text) return;
           const b = document.createElement("span");
           b.className = "dsd-badge" + (cls ? " " + cls : "");
           if (icon) {
@@ -288,12 +294,16 @@
         addBadge(row.sistema, "sistema", "fa-cogs");
         addBadge(row.ontime, "ontime", "fa-calendar-alt");
 
+        // Falhas — com tratamento especial para "\N"
         const falha = (row.falhas || "").toString().trim();
         if (falha && falha !== "\\N") {
           let cls = "falha-SF";
           if (falha === "CF=1") cls = "falha-CF1";
           else if (falha === "CF>1") cls = "falha-CFgt1";
           addBadge(falha, cls, "fa-exclamation-triangle");
+        } else {
+          // falhas = "\N" (ou vazio) → etiqueta "Não informado"
+          addBadge("Não informado", "falha-vazio", "fa-exclamation-triangle");
         }
 
         const lancada = (row.lancada || "").toString().trim();
@@ -533,7 +543,6 @@
       Graficos.updateStats(filteredData);
       Graficos.renderCharts(filteredData);
 
-      // Reaplica os itens escondidos na legenda (via toggleDataVisibility)
       applyChartHiddenState();
 
       refreshChartPlaceholders(filteredRaw.length > 0);
@@ -559,14 +568,9 @@
       }
     }
 
-    /**
-     * 🔥 Botão principal ("Limpar filtros" da barra superior):
-     * reseta filtros globais E também restaura os itens que foram
-     * ocultados clicando na legenda dos gráficos.
-     */
     function clearGlobalFilters() {
       resetGlobalFiltersState();
-      resetHiddenChartValues(); // 🔥 restaura os itens escondidos na legenda
+      resetHiddenChartValues();
 
       if (DashboardElements.filterOntime) {
         DashboardElements.filterOntime.value = "";
@@ -586,14 +590,9 @@
       applyFilters();
     }
 
-    /**
-     * 🔥 Botão da lista ("Limpar" ao lado dos filtros exclusivos):
-     * reseta filtros exclusivos E também restaura os itens que foram
-     * ocultados clicando na legenda dos gráficos.
-     */
     function clearListFilters() {
       resetListFiltersState();
-      resetHiddenChartValues(); // 🔥 restaura os itens escondidos na legenda
+      resetHiddenChartValues();
 
       if (DashboardElements.filterSegmento) {
         DashboardElements.filterSegmento.value = "";
@@ -724,13 +723,6 @@
     // 4.1.5 INTERATIVIDADE DA LEGENDA DOS GRÁFICOS
     // ============================================
 
-    /**
-     * Reaplica o estado "hidden" das legendas após o gráfico ser
-     * recriado (destroyCharts + new Chart).
-     *
-     * Usa `chart.toggleDataVisibility(index)` — mesma API do handler
-     * de clique — para garantir que o strikethrough também apareça.
-     */
     function applyChartHiddenState() {
       const Graficos = window.OntimeBoard && window.OntimeBoard.Graficos;
       if (!Graficos) return;
@@ -758,9 +750,6 @@
       applyToChart(state.chartInstances.line, hiddenChartValues.lineChart);
     }
 
-    /**
-     * Escuta os cliques na legenda disparados pelo Graficos.js.
-     */
     document.addEventListener("chartLegendToggle", function (e) {
       const { chartId, label, hidden } = e.detail;
 

@@ -1,7 +1,7 @@
 /* =========================================================
    ONTIMEBOARD · DASHBOARD.CSS
    ---------------------------------------------------------
-   Usado APENAS pela tela de dashboard (grafico.html).
+   Usado APENAS pela tela de dashboard (src/pages/grafico.html).
    ========================================================= */
 
 
@@ -1037,6 +1037,7 @@ body {
 .dsd-badge.falha-CF1   { background: #fff3e0; color: #e65100; }
 .dsd-badge.falha-CFgt1 { background: #e8f5e9; color: #2e7d32; }
 .dsd-badge.falha-SF    { background: #fdecea; color: #c62828; }
+.dsd-badge.falha-vazio { background: #f0f4fa; color: #6b7c8f; }
 
 /* Etiqueta "Lançada" / "Não Lançada" */
 .dsd-badge.lancada-sim   { background: #e8f5e9; color: #2e7d32; }
