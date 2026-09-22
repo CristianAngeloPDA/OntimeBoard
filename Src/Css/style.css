@@ -1,7 +1,7 @@
 /* =========================================================
    ONTIMEBOARD · STYLE.CSS
    ---------------------------------------------------------
-   Usado APENAS pela tela de upload (index.html).
+   Usado APENAS pela tela de upload (src/pages/index.html).
    ========================================================= */
 
 
@@ -83,15 +83,12 @@ body {
   color: #0b2b4a;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
-/* Logo (imagem) dentro do navbar */
-.logo-img {
-  height: 42px;
-  width: auto;
-  display: block;
-  object-fit: contain;
+.logo i {
+  color: #2a7de1;
+  font-size: 1.6rem;
 }
 
 .menu-toggle {
@@ -598,8 +595,8 @@ body {
     font-size: 1.25rem;
   }
 
-  .logo-img {
-    height: 34px;
+  .logo i {
+    font-size: 1.35rem;
   }
 
   .app-wrapper {
