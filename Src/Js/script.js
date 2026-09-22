@@ -1,18 +1,14 @@
 /**
- * OntimeBoard - Scripts e Funcionalidades
+ * OntimeBoard - Main Scripts
  *
  * Recursos:
- * - filtro global de Tipo Dev (barra superior) — afeta gráficos E lista
- * - lista de cargas (DESCRIÇÃO DSD) abaixo dos gráficos
- * - filtros exclusivos da lista: Segmento, Sistema, Lançada e Falhas
- *   (NÃO afetam os gráficos; só filtram a lista)
- * - cada grupo de filtros tem seu PRÓPRIO botão de limpar
- * - FILTROS CASCATEADOS:
- *     • Montadora depende de Ontime + Tipo Dev
- *     • Sistema da lista depende de Ontime
- * - etiqueta "Lançada" / "Não Lançada" em cada carga da lista
- * - CONFLITO DE SISTEMA: quando o Sistema global estiver ativo,
- *   o Sistema da lista é desabilitado (evita redundância)
+ * - filtros globais + filtros exclusivos da lista
+ * - filtros cascateados (Montadora depende de Ontime + Tipo Dev)
+ * - etiqueta "Lançada" / "Não Lançada"
+ * - mensagem "sem resultado" quando os filtros zeram o dataset
+ * - cliques na legenda dos gráficos de pizza filtram a lista DSD
+ * - 🔥 Botões "Limpar filtros" / "Limpar" RESTAURAM também os itens
+ *   que foram ocultados clicando na legenda dos gráficos
  */
 
 (function () {
@@ -20,6 +16,20 @@
 
   console.log("⚡ OntimeBoard - Scripts carregados");
   console.log("SheetJS:", typeof XLSX);
+
+  // ============================================
+  // 0. ESTADO DOS ITENS ESCONDIDOS NOS GRÁFICOS
+  // ============================================
+
+  const hiddenChartValues = {
+    pieChart: new Set(),
+    lineChart: new Set(),
+  };
+
+  function resetHiddenChartValues() {
+    hiddenChartValues.pieChart.clear();
+    hiddenChartValues.lineChart.clear();
+  }
 
   // ============================================
   // 1. REFERÊNCIAS DA ESTRUTURA
@@ -55,28 +65,23 @@
     // ============================================
 
     const DashboardElements = {
-      // Stats (5 cards)
       totalSales: document.getElementById("totalSales"),
       totalRevenue: document.getElementById("totalRevenue"),
       averageSale: document.getElementById("averageSale"),
       buscasAutomaticas: document.getElementById("buscasAutomaticas"),
       reprovadas: document.getElementById("reprovadas"),
 
-      // Canvas dos gráficos
       barChart: document.getElementById("barChart"),
       pieChart: document.getElementById("pieChart"),
       lineChart: document.getElementById("lineChart"),
 
-      // Placeholders
       barPlaceholder: document.getElementById("barPlaceholder"),
       piePlaceholder: document.getElementById("piePlaceholder"),
       linePlaceholder: document.getElementById("linePlaceholder"),
 
-      // Títulos
       dashboardTitle: DOM.dashboardTitle,
       dashboardSubtitle: DOM.dashboardSubtitle,
 
-      // Filtros globais
       filtersBar: document.getElementById("filtersBar"),
       filterOntime: document.getElementById("filterOntime"),
       filterTipoDev: document.getElementById("filterTipoDev"),
@@ -85,14 +90,12 @@
       btnClearFilters: document.getElementById("btnClearFilters"),
       filtersActiveBadge: document.getElementById("filtersActiveBadge"),
 
-      // Filtros exclusivos da lista
       filterSegmento: document.getElementById("filterSegmento"),
       filterListSistema: document.getElementById("filterListSistema"),
       filterLancada: document.getElementById("filterLancada"),
       filterFalhas: document.getElementById("filterFalhas"),
       btnClearListFilters: document.getElementById("btnClearListFilters"),
 
-      // Lista de cargas
       dsdListContainer: document.getElementById("dsdListContainer"),
       dsdListCount: document.getElementById("dsdListCount"),
       dsdListSubtitle: document.getElementById("dsdListSubtitle"),
@@ -106,13 +109,12 @@
       currentData: null,
       isProcessing: false,
       allRawData: [],
+      lastListFiltered: [],
       filters: {
-        // Globais — afetam gráficos e lista
         ontime: "",
         tipoDev: "",
         montadora: "",
         sistema: "",
-        // Exclusivos da lista — NÃO afetam os gráficos
         segmento: "",
         listSistema: "",
         lancada: "",
@@ -174,9 +176,13 @@
 
       ScriptState.isProcessing = true;
 
+      // Novo arquivo → limpa tudo (inclusive os itens ocultados na legenda)
+      resetHiddenChartValues();
+
       Dados.processExcelFile(fileData)
         .then((processedData) => {
           ScriptState.allRawData = processedData.raw;
+          ScriptState.lastListFiltered = processedData.raw;
           resetAllFiltersState();
 
           populateFilters(ScriptState.allRawData);
@@ -186,7 +192,9 @@
           Graficos.updateStats(processedData);
           Graficos.renderCharts(processedData);
 
-          renderDsdList(ScriptState.allRawData);
+          refreshChartPlaceholders(processedData.totalCargas > 0);
+
+          renderDsdListWithChartFilters(ScriptState.allRawData);
 
           console.log("[Dashboard] Gráficos renderizados com sucesso");
         })
@@ -208,6 +216,18 @@
     // ============================================
     // 4.0.1 LISTA DE CARGAS (DESCRIÇÃO DSD)
     // ============================================
+
+    function renderDsdListWithChartFilters(listRaw) {
+      const source = Array.isArray(listRaw) ? listRaw : [];
+
+      const filtered = source.filter((row) => {
+        const tipoDevHidden = hiddenChartValues.pieChart.has(row.tipoDev);
+        const falhasHidden = hiddenChartValues.lineChart.has(row.falhas);
+        return !tipoDevHidden && !falhasHidden;
+      });
+
+      renderDsdList(filtered);
+    }
 
     function renderDsdList(rawData) {
       const container = DashboardElements.dsdListContainer;
@@ -276,7 +296,6 @@
           addBadge(falha, cls, "fa-exclamation-triangle");
         }
 
-        // Etiqueta "Lançada" / "Não Lançada"
         const lancada = (row.lancada || "").toString().trim();
         if (lancada && lancada !== "\\N") {
           const norm = normalizeText(lancada);
@@ -316,7 +335,6 @@
         "Todos",
       );
 
-      // Montadora depende de Ontime + Tipo Dev
       refreshMontadoraOptions();
 
       fillSelectOptions(
@@ -342,15 +360,6 @@
       syncListSistemaDisabledState();
     }
 
-    /**
-     * Filtro cascateado — Montadora (global).
-     *
-     * Mostra apenas as montadoras que existem dentro da combinação
-     * atual de Ontime + Tipo Dev.
-     *
-     * Se a montadora previamente selecionada não existir mais na
-     * nova lista, reseta para "Todas" (evita filtro "fantasma").
-     */
     function refreshMontadoraOptions() {
       const Dados = window.OntimeBoard && window.OntimeBoard.Dados;
       if (!Dados || !DashboardElements.filterMontadora) return;
@@ -359,7 +368,6 @@
       const tipoDevAtual = ScriptState.filters.tipoDev;
       const tipoDevNorm = normalizeText(tipoDevAtual);
 
-      // Base filtrada por Ontime + Tipo Dev
       const base = ScriptState.allRawData.filter((r) => {
         const matchOntime = !ontimeAtual || r.ontime === ontimeAtual;
         const matchTipoDev =
@@ -384,10 +392,6 @@
       }
     }
 
-    /**
-     * Filtro cascateado — Sistema (exclusivo da lista).
-     * Só mostra sistemas presentes no Ontime atual.
-     */
     function refreshListSistemaOptions() {
       const Dados = window.OntimeBoard && window.OntimeBoard.Dados;
       if (!Dados || !DashboardElements.filterListSistema) return;
@@ -415,10 +419,6 @@
       }
     }
 
-    /**
-     * Sincroniza o estado do filtro "Sistema" da lista com o
-     * filtro "Sistema" global.
-     */
     function syncListSistemaDisabledState() {
       const el = DashboardElements.filterListSistema;
       if (!el) return;
@@ -492,7 +492,6 @@
       const lancadaNorm = normalizeText(lancada);
       const falhasNorm = normalizeText(falhas);
 
-      // Base com filtros globais
       const filteredRaw = ScriptState.allRawData.filter((r) => {
         const matchOntime = !ontime || r.ontime === ontime;
         const matchTipoDev =
@@ -504,7 +503,6 @@
         return matchOntime && matchTipoDev && matchMontadora && matchSistema;
       });
 
-      // Lista — aplica filtros exclusivos também
       const listOnlyFiltered = filteredRaw.filter((r) => {
         const matchSegmento =
           !segmentoNorm || normalizeText(r.segmento) === segmentoNorm;
@@ -535,7 +533,13 @@
       Graficos.updateStats(filteredData);
       Graficos.renderCharts(filteredData);
 
-      renderDsdList(listOnlyFiltered);
+      // Reaplica os itens escondidos na legenda (via toggleDataVisibility)
+      applyChartHiddenState();
+
+      refreshChartPlaceholders(filteredRaw.length > 0);
+
+      ScriptState.lastListFiltered = listOnlyFiltered;
+      renderDsdListWithChartFilters(listOnlyFiltered);
 
       const hasActiveFilter = !!(
         ontime ||
@@ -555,8 +559,14 @@
       }
     }
 
+    /**
+     * 🔥 Botão principal ("Limpar filtros" da barra superior):
+     * reseta filtros globais E também restaura os itens que foram
+     * ocultados clicando na legenda dos gráficos.
+     */
     function clearGlobalFilters() {
       resetGlobalFiltersState();
+      resetHiddenChartValues(); // 🔥 restaura os itens escondidos na legenda
 
       if (DashboardElements.filterOntime) {
         DashboardElements.filterOntime.value = "";
@@ -571,15 +581,19 @@
         DashboardElements.filterSistema.value = "";
       }
 
-      // Repopula montadoras com todos os valores (filtros zerados)
       refreshMontadoraOptions();
-
       syncListSistemaDisabledState();
       applyFilters();
     }
 
+    /**
+     * 🔥 Botão da lista ("Limpar" ao lado dos filtros exclusivos):
+     * reseta filtros exclusivos E também restaura os itens que foram
+     * ocultados clicando na legenda dos gráficos.
+     */
     function clearListFilters() {
       resetListFiltersState();
+      resetHiddenChartValues(); // 🔥 restaura os itens escondidos na legenda
 
       if (DashboardElements.filterSegmento) {
         DashboardElements.filterSegmento.value = "";
@@ -601,7 +615,6 @@
 
     // ----- Listeners dos filtros globais -----
 
-    // Ontime → atualiza a cascata de Montadora e Sistema (lista)
     if (DashboardElements.filterOntime) {
       DashboardElements.filterOntime.addEventListener("change", function () {
         ScriptState.filters.ontime = this.value;
@@ -612,7 +625,6 @@
       });
     }
 
-    // Tipo Dev → atualiza a cascata de Montadora
     if (DashboardElements.filterTipoDev) {
       DashboardElements.filterTipoDev.addEventListener(
         "change",
@@ -634,7 +646,6 @@
       );
     }
 
-    // Sistema global → trava/destrava o Sistema da lista
     if (DashboardElements.filterSistema) {
       DashboardElements.filterSistema.addEventListener(
         "change",
@@ -710,6 +721,65 @@
     }
 
     // ============================================
+    // 4.1.5 INTERATIVIDADE DA LEGENDA DOS GRÁFICOS
+    // ============================================
+
+    /**
+     * Reaplica o estado "hidden" das legendas após o gráfico ser
+     * recriado (destroyCharts + new Chart).
+     *
+     * Usa `chart.toggleDataVisibility(index)` — mesma API do handler
+     * de clique — para garantir que o strikethrough também apareça.
+     */
+    function applyChartHiddenState() {
+      const Graficos = window.OntimeBoard && window.OntimeBoard.Graficos;
+      if (!Graficos) return;
+
+      const state = Graficos.getState();
+
+      const applyToChart = (chart, hiddenSet) => {
+        if (!chart) return;
+        if (hiddenSet.size === 0) return;
+
+        const labels = chart.data.labels || [];
+        let anyToggled = false;
+
+        labels.forEach((label, index) => {
+          if (hiddenSet.has(label)) {
+            chart.toggleDataVisibility(index);
+            anyToggled = true;
+          }
+        });
+
+        if (anyToggled) chart.update();
+      };
+
+      applyToChart(state.chartInstances.pie, hiddenChartValues.pieChart);
+      applyToChart(state.chartInstances.line, hiddenChartValues.lineChart);
+    }
+
+    /**
+     * Escuta os cliques na legenda disparados pelo Graficos.js.
+     */
+    document.addEventListener("chartLegendToggle", function (e) {
+      const { chartId, label, hidden } = e.detail;
+
+      if (chartId === "pieChart") {
+        if (hidden) hiddenChartValues.pieChart.add(label);
+        else hiddenChartValues.pieChart.delete(label);
+      } else if (chartId === "lineChart") {
+        if (hidden) hiddenChartValues.lineChart.add(label);
+        else hiddenChartValues.lineChart.delete(label);
+      }
+
+      console.log(
+        `[Gráfico] ${chartId} → "${label}" ${hidden ? "oculto" : "visível"}`,
+      );
+
+      renderDsdListWithChartFilters(ScriptState.lastListFiltered);
+    });
+
+    // ============================================
     // 4.2 FUNÇÕES DE UI
     // ============================================
 
@@ -728,6 +798,32 @@
 
       hideFiltersBar();
       renderDsdList([]);
+    }
+
+    function refreshChartPlaceholders(hasResults) {
+      const containers = document.querySelectorAll(".chart-container");
+
+      containers.forEach((container) => {
+        if (container.classList.contains("has-data")) return;
+
+        const placeholder = container.querySelector(".chart-placeholder");
+        if (!placeholder) return;
+
+        const p = placeholder.querySelector("p");
+        const span = placeholder.querySelector("span");
+
+        if (!hasResults) {
+          if (p) p.textContent = "Nenhum resultado encontrado";
+          if (span) {
+            span.textContent = "Nenhuma carga corresponde aos filtros aplicados";
+          }
+        } else {
+          if (p) p.textContent = "Sem dados para exibir";
+          if (span) {
+            span.textContent = "A planilha não contém dados desta categoria";
+          }
+        }
+      });
     }
 
     function showPlaceholders(fileName) {

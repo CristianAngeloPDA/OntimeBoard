@@ -9,8 +9,8 @@
  *     - lineChart -> Falhas: CF=1 / CF>1 / SF (pizza)
  * - Atualização das estatísticas exibidas nos cards
  *
- * 🔥 NOVO: Usa o plugin chartjs-plugin-datalabels para exibir
- *    os valores permanentemente nos gráficos (sem precisar hover).
+ * Cliques na legenda dos gráficos de pizza disparam o evento
+ * `chartLegendToggle` — o main.js escuta e refiltra a lista DSD.
  */
 
 (function () {
@@ -22,15 +22,20 @@
   // 0. REGISTRO DO PLUGIN DE DATALABELS
   // ============================================
 
-  // Registra o plugin globalmente (idempotente — não dá erro se já
-  // estiver registrado automaticamente pelo <script> no HTML).
-  if (typeof ChartDataLabels !== "undefined") {
-    Chart.register(ChartDataLabels);
-    console.log("🏷️  ChartDataLabels registrado");
-  } else {
-    console.warn(
-      "⚠️  ChartDataLabels não encontrado. Verifique se o <script> do plugin foi incluído no HTML.",
-    );
+  let _dataLabelsRegistered = false;
+
+  function ensureDataLabelsRegistered() {
+    if (_dataLabelsRegistered) return;
+
+    if (typeof ChartDataLabels !== "undefined") {
+      Chart.register(ChartDataLabels);
+      _dataLabelsRegistered = true;
+      console.log("🏷️  ChartDataLabels registrado");
+    } else {
+      console.warn(
+        "⚠️  ChartDataLabels não encontrado. Verifique se o <script> do plugin foi incluído no HTML.",
+      );
+    }
   }
 
   // ============================================
@@ -57,7 +62,6 @@
     },
   };
 
-  // Paleta padrão para séries com número variável de categorias
   const CHART_COLORS = [
     "#2a7de1",
     "#388e3c",
@@ -71,7 +75,6 @@
     "#546e7a",
   ];
 
-  // Cores fixas para o gráfico de falhas (mantém sentido: vermelho = pior)
   const FALHAS_COLORS = {
     "CF=1": "#f57c00",
     "CF>1": "#388e3c",
@@ -79,13 +82,9 @@
   };
 
   // ============================================
-  // 2.1 CONFIGURAÇÕES DE DATALABELS (🔥 NOVO)
+  // 2.1 CONFIGURAÇÕES DE DATALABELS
   // ============================================
 
-  /**
-   * Configuração dos labels para o gráfico de BARRAS.
-   * Mostra o valor acima de cada barra, em texto escuro bold.
-   */
   const BAR_DATALABELS = {
     anchor: "end",
     align: "top",
@@ -99,11 +98,6 @@
     formatter: (value) => value,
   };
 
-  /**
-   * Configuração dos labels para os gráficos de PIZZA.
-   * Mostra o valor no centro de cada fatia, em branco bold com
-   * contorno sutil para garantir leitura sobre qualquer cor.
-   */
   const PIE_DATALABELS = {
     color: "#ffffff",
     font: {
@@ -113,11 +107,9 @@
     },
     anchor: "center",
     align: "center",
-    // Contorno para dar contraste sobre fatias claras
     textStrokeColor: "rgba(0, 0, 0, 0.35)",
     textStrokeWidth: 3,
     formatter: (value) => value,
-    // Esconde o label em fatias muito pequenas (< 5%) para não sobrepor
     display: function (ctx) {
       const data = ctx.dataset.data || [];
       const total = data.reduce((a, b) => a + b, 0);
@@ -126,6 +118,45 @@
       return percent >= 5;
     },
   };
+
+  // ============================================
+  // 2.2 HANDLER DE CLIQUE NA LEGENDA
+  // ============================================
+
+  /**
+   * Cria um handler para o clique na legenda de um gráfico de pizza.
+   *
+   * Usa `chart.toggleDataVisibility(index)` (API oficial do Chart.js v4
+   * para pie/doughnut) em vez de manipular `item.hidden` diretamente.
+   * Isso garante que o Chart.js redesenhe a legenda corretamente —
+   * incluindo o efeito de texto riscado (strikethrough).
+   *
+   * @param {string} chartId - ID do <canvas> ("pieChart" ou "lineChart")
+   */
+  function createLegendOnClickHandler(chartId) {
+    return function (e, legendItem, legend) {
+      const chart = legend.chart;
+      const index = legendItem.index;
+
+      // API oficial: alterna a visibilidade da fatia
+      chart.toggleDataVisibility(index);
+      chart.update();
+
+      // Lê o estado resultante direto do chart
+      const isNowHidden = !chart.getDataVisibility(index);
+
+      // Notifica o resto da aplicação
+      document.dispatchEvent(
+        new CustomEvent("chartLegendToggle", {
+          detail: {
+            chartId: chartId,
+            label: legendItem.text,
+            hidden: isNowHidden,
+          },
+        }),
+      );
+    };
+  }
 
   // ============================================
   // 3. FUNÇÕES AUXILIARES
@@ -150,9 +181,6 @@
     });
   }
 
-  /**
-   * Alterna entre mostrar o canvas (com dado) ou o placeholder (sem dado)
-   */
   function toggleChartContainer(canvasId, hasData) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
@@ -165,6 +193,8 @@
   // ============================================
 
   function renderCharts(data) {
+    ensureDataLabelsRegistered();
+
     console.log("[Chart.js] Renderizando gráficos:", data);
 
     destroyCharts();
@@ -193,20 +223,17 @@
           options: {
             responsive: true,
             maintainAspectRatio: false,
-            // 🔥 Layout com espaço no topo para o label não cortar
             layout: {
               padding: { top: 24 },
             },
             plugins: {
               legend: { display: false },
-              // 🔥 LABELS DE VALOR NO TOPO DAS BARRAS
               datalabels: BAR_DATALABELS,
             },
             scales: {
               y: {
                 beginAtZero: true,
                 ticks: { precision: 0 },
-                // 🔥 Dá um "respiro" no eixo Y pra barra mais alta não encostar no topo
                 grace: "10%",
               },
             },
@@ -233,8 +260,10 @@
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-              legend: { position: "bottom" },
-              // 🔥 LABELS DE VALOR DENTRO DAS FATIAS
+              legend: {
+                position: "bottom",
+                onClick: createLegendOnClickHandler("pieChart"),
+              },
               datalabels: PIE_DATALABELS,
             },
           },
@@ -263,8 +292,10 @@
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-              legend: { position: "bottom" },
-              // 🔥 LABELS DE VALOR DENTRO DAS FATIAS
+              legend: {
+                position: "bottom",
+                onClick: createLegendOnClickHandler("lineChart"),
+              },
               datalabels: PIE_DATALABELS,
             },
           },
@@ -274,9 +305,6 @@
     }
   }
 
-  /**
-   * Atualiza os 5 cards de estatística no topo do dashboard
-   */
   function updateStats(data) {
     console.log("[Stats] Atualizando estatísticas:", data);
 
