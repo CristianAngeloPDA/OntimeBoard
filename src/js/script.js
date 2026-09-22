@@ -5,10 +5,12 @@
  * - filtros globais + filtros exclusivos da lista
  * - filtros cascateados (Montadora depende de Ontime + Tipo Dev)
  * - etiqueta "Lançada" / "Não Lançada" e "Não informado" (falhas = \N)
- * - mensagem "sem resultado" quando os filtros zeram o dataset
- * - cliques na legenda dos gráficos de pizza filtram a lista DSD
- * - Botões "Limpar filtros" / "Limpar" RESTAURAM também os itens
- *   que foram ocultados clicando na legenda dos gráficos
+ * - cliques na legenda dos gráficos de pizza filtram TODOS os gráficos,
+ *   cards e lista DSD (comportamento de filtro global)
+ * - Se TODAS as fatias de um gráfico forem ocultadas → mostra "sem
+ *   resultados" em todos os gráficos
+ * - Botões "Limpar filtros" / "Limpar" RESTAURAM os itens ocultados
+ *   clicando na legenda
  */
 
 (function () {
@@ -21,6 +23,16 @@
   // 0. ESTADO DOS ITENS ESCONDIDOS NOS GRÁFICOS
   // ============================================
 
+  /**
+   * Valores ocultados clicando na legenda de cada gráfico.
+   *
+   * Esses valores são aplicados como filtro em:
+   *   - Cards
+   *   - Gráficos que não sejam o próprio (ex.: ocultar em Tipo Dev
+   *     afeta o gráfico de Segmento e o de Falhas, mas NÃO o de Tipo Dev
+   *     — que precisa manter a fatia para mostrar o strikethrough)
+   *   - Lista DSD
+   */
   const hiddenChartValues = {
     pieChart: new Set(),
     lineChart: new Set(),
@@ -109,7 +121,8 @@
       currentData: null,
       isProcessing: false,
       allRawData: [],
-      lastListFiltered: [],
+      /** Dataset após aplicar APENAS os filtros de select (não os da legenda) */
+      filteredBySelects: [],
       filters: {
         ontime: "",
         tipoDev: "",
@@ -181,19 +194,13 @@
       Dados.processExcelFile(fileData)
         .then((processedData) => {
           ScriptState.allRawData = processedData.raw;
-          ScriptState.lastListFiltered = processedData.raw;
           resetAllFiltersState();
 
           populateFilters(ScriptState.allRawData);
           showFiltersBar();
 
-          ScriptState.currentData = processedData;
-          Graficos.updateStats(processedData);
-          Graficos.renderCharts(processedData);
-
-          refreshChartPlaceholders(processedData.totalCargas > 0);
-
-          renderDsdListWithChartFilters(ScriptState.allRawData);
+          // Aplica todos os filtros (nenhum ativo no início)
+          applyFilters();
 
           console.log("[Dashboard] Gráficos renderizados com sucesso");
         })
@@ -215,25 +222,6 @@
     // ============================================
     // 4.0.1 LISTA DE CARGAS (DESCRIÇÃO DSD)
     // ============================================
-
-    /**
-     * Renderiza a lista considerando apenas os valores específicos
-     * que foram ocultados clicando na legenda.
-     *
-     * Cargas com `falhas = "\N"` NÃO são afetadas por ocultar
-     * fatias do gráfico de Falhas — continuam visíveis.
-     */
-    function renderDsdListWithChartFilters(listRaw) {
-      const source = Array.isArray(listRaw) ? listRaw : [];
-
-      const filtered = source.filter((row) => {
-        const tipoDevHidden = hiddenChartValues.pieChart.has(row.tipoDev);
-        const falhasHidden = hiddenChartValues.lineChart.has(row.falhas);
-        return !tipoDevHidden && !falhasHidden;
-      });
-
-      renderDsdList(filtered);
-    }
 
     function renderDsdList(rawData) {
       const container = DashboardElements.dsdListContainer;
@@ -302,7 +290,6 @@
           else if (falha === "CF>1") cls = "falha-CFgt1";
           addBadge(falha, cls, "fa-exclamation-triangle");
         } else {
-          // falhas = "\N" (ou vazio) → etiqueta "Não informado"
           addBadge("Não informado", "falha-vazio", "fa-exclamation-triangle");
         }
 
@@ -479,11 +466,12 @@
       }
     }
 
+    /**
+     * Calcula o dataset filtrado APENAS pelos selects e atualiza o
+     * badge de filtros ativos. Depois delega para `recomputeDashboard()`
+     * que faz o resto (gráficos, cards, lista, placeholders).
+     */
     function applyFilters() {
-      const Dados = window.OntimeBoard.Dados;
-      const Graficos = window.OntimeBoard.Graficos;
-      if (!Dados || !Graficos) return;
-
       const {
         ontime,
         tipoDev,
@@ -502,18 +490,13 @@
       const lancadaNorm = normalizeText(lancada);
       const falhasNorm = normalizeText(falhas);
 
-      const filteredRaw = ScriptState.allRawData.filter((r) => {
+      const filteredBySelects = ScriptState.allRawData.filter((r) => {
         const matchOntime = !ontime || r.ontime === ontime;
         const matchTipoDev =
           !tipoDevNorm || normalizeText(r.tipoDev) === tipoDevNorm;
         const matchMontadora = !montadora || r.montadora === montadora;
         const matchSistema =
           !sistemaNorm || normalizeText(r.sistema) === sistemaNorm;
-
-        return matchOntime && matchTipoDev && matchMontadora && matchSistema;
-      });
-
-      const listOnlyFiltered = filteredRaw.filter((r) => {
         const matchSegmento =
           !segmentoNorm || normalizeText(r.segmento) === segmentoNorm;
         const matchListSistema =
@@ -525,6 +508,10 @@
           !falhasNorm || normalizeText(r.falhas) === falhasNorm;
 
         return (
+          matchOntime &&
+          matchTipoDev &&
+          matchMontadora &&
+          matchSistema &&
           matchSegmento &&
           matchListSistema &&
           matchLancada &&
@@ -533,23 +520,13 @@
       });
 
       console.log(
-        `[Filtros] Globais → ${filteredRaw.length} carga(s) | ` +
-          `Lista → ${listOnlyFiltered.length} carga(s)`,
+        `[Filtros] Selects → ${filteredBySelects.length} carga(s) | ` +
+          `Legendas ocultas → pieChart=${hiddenChartValues.pieChart.size} lineChart=${hiddenChartValues.lineChart.size}`,
       );
 
-      const filteredData = Dados.processData(filteredRaw);
-      ScriptState.currentData = filteredData;
+      ScriptState.filteredBySelects = filteredBySelects;
 
-      Graficos.updateStats(filteredData);
-      Graficos.renderCharts(filteredData);
-
-      applyChartHiddenState();
-
-      refreshChartPlaceholders(filteredRaw.length > 0);
-
-      ScriptState.lastListFiltered = listOnlyFiltered;
-      renderDsdListWithChartFilters(listOnlyFiltered);
-
+      // Badge de filtros ativos considera só os selects
       const hasActiveFilter = !!(
         ontime ||
         tipoDev ||
@@ -566,6 +543,116 @@
           hasActiveFilter,
         );
       }
+
+      recomputeDashboard();
+    }
+
+    /**
+     * Recalcula tudo (cards, gráficos, lista) considerando:
+     *   - O dataset já filtrado pelos selects (`ScriptState.filteredBySelects`)
+     *   - Os itens ocultados clicando na legenda (`hiddenChartValues`)
+     *
+     * Regras:
+     *   - barChart (Segmento)  → exclui tanto tipoDev ocultos quanto falhas ocultas
+     *   - pieChart (Tipo Dev)  → exclui apenas falhas ocultas
+     *                            (mantém os tipoDev ocultos para poder
+     *                             desenhar o strikethrough na legenda)
+     *   - lineChart (Falhas)   → exclui apenas tipoDev ocultos
+     *   - Cards e lista DSD    → usam a base mais restritiva (como barChart)
+     *
+     * Se TODAS as fatias de pieChart OU de lineChart estiverem ocultas,
+     * todo o dashboard é zerado e mostra "sem resultados".
+     */
+    function recomputeDashboard() {
+      const Dados = window.OntimeBoard.Dados;
+      const Graficos = window.OntimeBoard.Graficos;
+      if (!Dados || !Graficos) return;
+
+      const filteredRaw = ScriptState.filteredBySelects || [];
+
+      // ---- Detecta "todas as fatias ocultas" ----
+      const uniqueTipoDev = Array.from(
+        new Set(
+          filteredRaw
+            .map((r) => (r.tipoDev || "").toString().trim())
+            .filter(Boolean),
+        ),
+      );
+
+      const uniqueFalhas = Array.from(
+        new Set(
+          filteredRaw
+            .map((r) => (r.falhas || "").toString().trim())
+            .filter(Boolean),
+        ),
+      );
+
+      const allPieHidden =
+        uniqueTipoDev.length > 0 &&
+        uniqueTipoDev.every((v) => hiddenChartValues.pieChart.has(v));
+
+      const allLineHidden =
+        uniqueFalhas.length > 0 &&
+        uniqueFalhas.every((v) => hiddenChartValues.lineChart.has(v));
+
+      const noResults =
+        filteredRaw.length === 0 || allPieHidden || allLineHidden;
+
+      if (noResults) {
+        console.log("[Dashboard] Sem resultados — zerando tudo");
+
+        resetStats();
+
+        // Renderiza gráficos vazios para acionar os placeholders
+        Graficos.renderCharts({
+          porSegmento: {},
+          porTipoDev: {},
+          porFalhas: { "CF=1": 0, "CF>1": 0, SF: 0 },
+        });
+
+        refreshChartPlaceholders(false);
+        renderDsdList([]);
+        return;
+      }
+
+      // ---- Calcula bases para cada gráfico ----
+      const barBase = filteredRaw.filter(
+        (r) =>
+          !hiddenChartValues.pieChart.has(r.tipoDev) &&
+          !hiddenChartValues.lineChart.has(r.falhas),
+      );
+
+      const pieBase = filteredRaw.filter(
+        (r) => !hiddenChartValues.lineChart.has(r.falhas),
+      );
+
+      const lineBase = filteredRaw.filter(
+        (r) => !hiddenChartValues.pieChart.has(r.tipoDev),
+      );
+
+      // ---- Processa cada base ----
+      const barProcessed = Dados.processData(barBase);
+      const pieProcessed = Dados.processData(pieBase);
+      const lineProcessed = Dados.processData(lineBase);
+
+      // ---- Atualiza cards (usa a base mais restritiva) ----
+      Graficos.updateStats(barProcessed);
+
+      // ---- Renderiza gráficos com as bases específicas ----
+      Graficos.renderCharts({
+        porSegmento: barProcessed.porSegmento,
+        porTipoDev: pieProcessed.porTipoDev,
+        porFalhas: lineProcessed.porFalhas,
+      });
+
+      // ---- Reaplica o estado "hidden" nos gráficos recém-criados ----
+      applyChartHiddenState();
+
+      // ---- Atualiza placeholders (para gráficos específicos vazios) ----
+      refreshChartPlaceholders(barBase.length > 0);
+
+      // ---- Renderiza a lista DSD ----
+      renderDsdList(barBase);
     }
 
     function clearGlobalFilters() {
@@ -723,6 +810,14 @@
     // 4.1.5 INTERATIVIDADE DA LEGENDA DOS GRÁFICOS
     // ============================================
 
+    /**
+     * Reaplica o estado "hidden" nos gráficos recém-criados.
+     *
+     * Chamado depois de `Graficos.renderCharts()` — como o render
+     * destrói e recria cada gráfico, precisamos reaplicar o
+     * `toggleDataVisibility` para que o strikethrough na legenda
+     * e as fatias ocultas sejam mantidas.
+     */
     function applyChartHiddenState() {
       const Graficos = window.OntimeBoard && window.OntimeBoard.Graficos;
       if (!Graficos) return;
@@ -750,6 +845,12 @@
       applyToChart(state.chartInstances.line, hiddenChartValues.lineChart);
     }
 
+    /**
+     * Escuta os cliques na legenda disparados pelo Graficos.js.
+     *
+     * Atualiza os sets de valores ocultos e RECALCULA todo o dashboard
+     * (cards, gráficos, lista) para refletir a exclusão.
+     */
     document.addEventListener("chartLegendToggle", function (e) {
       const { chartId, label, hidden } = e.detail;
 
@@ -765,7 +866,7 @@
         `[Gráfico] ${chartId} → "${label}" ${hidden ? "oculto" : "visível"}`,
       );
 
-      renderDsdListWithChartFilters(ScriptState.lastListFiltered);
+      recomputeDashboard();
     });
 
     // ============================================
