@@ -2,10 +2,6 @@
   "redirects": [
     { "source": "/", "destination": "/src/pages/index.html", "permanent": false },
     { "source": "/index", "destination": "/src/pages/index.html", "permanent": false },
-    { "source": "/index.html", "destination": "/src/pages/index.html", "permanent": false },
-    { "source": "/grafico", "destination": "/src/pages/grafico.html", "permanent": false },
-    { "source": "/grafico.html", "destination": "/src/pages/grafico.html", "permanent": false }
-  ],
-  "cleanUrls": true,
-  "trailingSlash": false
+    { "source": "/grafico", "destination": "/src/pages/grafico.html", "permanent": false }
+  ]
 }
