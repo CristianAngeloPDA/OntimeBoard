@@ -1,7 +1,7 @@
 {
   "redirects": [
-    { "source": "/", "destination": "/Src/Pages/index.html", "permanent": false },
-    { "source": "/index", "destination": "/Src/Pages/index.html", "permanent": false },
-    { "source": "/grafico", "destination": "/Src/Pages/grafico.html", "permanent": false }
+    { "source": "/", "destination": "/src/pages/index.html", "permanent": false },
+    { "source": "/index", "destination": "/src/pages/index.html", "permanent": false },
+    { "source": "/grafico", "destination": "/src/pages/grafico.html", "permanent": false }
   ]
 }
